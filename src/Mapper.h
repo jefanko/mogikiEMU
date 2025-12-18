@@ -19,6 +19,13 @@ public:
   virtual bool ppuMapRead(uint16_t addr, uint32_t &mapped_addr) = 0;
   virtual bool ppuMapWrite(uint16_t addr, uint32_t &mapped_addr) = 0;
 
+  // Custom PPU Read (Data retrieval) - for complex mirroring (MMC5)
+  // Returns true if the mapper has provided data directly
+  virtual bool ppuReadCustom(uint16_t addr, uint8_t &data) { return false; }
+
+  // Custom PPU Write (Data storage) - for complex mirroring (MMC5)
+  virtual bool ppuWriteCustom(uint16_t addr, uint8_t data) { return false; }
+
   virtual void reset() {}
 
   // Get current mirroring mode

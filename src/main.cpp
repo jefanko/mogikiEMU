@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Initialize SDL Audio with larger buffer
-  SDL_AudioSpec audioSpec;
+  SDL_AudioSpec audioSpec, obtainedSpec;
   SDL_zero(audioSpec);
   audioSpec.freq = 44100;
   audioSpec.format = AUDIO_F32SYS;
@@ -74,13 +74,16 @@ int main(int argc, char *argv[]) {
   audioSpec.callback = AudioCallback;
   audioSpec.userdata = nullptr;
 
-  SDL_AudioDeviceID audioDevice =
-      SDL_OpenAudioDevice(nullptr, 0, &audioSpec, nullptr, 0);
+  int actualSampleRate = 44100;
+  SDL_AudioDeviceID audioDevice = SDL_OpenAudioDevice(
+      nullptr, 0, &audioSpec, &obtainedSpec, SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
   if (audioDevice == 0) {
     std::cerr << "Failed to open audio: " << SDL_GetError() << std::endl;
   } else {
+    actualSampleRate = obtainedSpec.freq;
     SDL_PauseAudioDevice(audioDevice, 0);
-    std::cout << "Audio initialized at 44100 Hz" << std::endl;
+    std::cout << "Audio initialized at " << actualSampleRate << " Hz"
+              << std::endl;
   }
 
   std::cout << "NES Emulator Started" << std::endl;
@@ -108,10 +111,9 @@ int main(int argc, char *argv[]) {
   int menuCommand = 0;
 
   // Audio timing - NES CPU runs at 1.789773 MHz (NTSC)
-  // We sample at 44100 Hz
-  // That means we sample every ~40.58 CPU cycles
+  // We sample at the actual sample rate SDL gave us
   const double CPU_FREQ = 1789773.0;
-  const double SAMPLE_FREQ = 44100.0;
+  const double SAMPLE_FREQ = (double)actualSampleRate;
   const double CYCLES_PER_SAMPLE = CPU_FREQ / SAMPLE_FREQ;
   double audioSampleCounter = 0.0;
 

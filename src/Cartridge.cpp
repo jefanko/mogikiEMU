@@ -3,6 +3,8 @@
 #include "Mapper_001.h"
 #include "Mapper_002.h"
 #include "Mapper_004.h"
+#include "Mapper_005.h"
+#include "Mapper_069.h"
 #include <fstream>
 #include <iostream>
 
@@ -43,6 +45,13 @@ Cartridge::Cartridge(const std::string &sFileName) {
               << (hwMirror == MIRROR::VERTICAL ? "Vertical" : "Horizontal")
               << std::endl;
 
+    // Debug log to file
+    std::ofstream debugLog("nes_debug.log", std::ios::app);
+    debugLog << "Loading ROM - Mapper: " << (int)nMapperID
+             << ", PRG: " << (int)nPRGBanks << ", CHR: " << (int)nCHRBanks
+             << std::endl;
+    debugLog.close();
+
     vPRGMemory.resize(nPRGBanks * 16384);
     ifs.read((char *)vPRGMemory.data(), vPRGMemory.size());
 
@@ -67,8 +76,34 @@ Cartridge::Cartridge(const std::string &sFileName) {
     case 4:
       pMapper = std::make_shared<Mapper_004>(nPRGBanks, nCHRBanks);
       break;
+    case 5: {
+      std::ofstream debugLog("nes_debug.log", std::ios::app);
+      debugLog << "Creating Mapper 5 (MMC5)..." << std::endl;
+      debugLog.close();
+    }
+      pMapper = std::make_shared<Mapper_005>(nPRGBanks, nCHRBanks);
+      {
+        std::ofstream debugLog("nes_debug.log", std::ios::app);
+        debugLog << "Mapper 5 created successfully" << std::endl;
+        debugLog.close();
+      }
+      break;
+    case 69:
+      pMapper = std::make_shared<Mapper_069>(nPRGBanks, nCHRBanks);
+      {
+        std::ofstream debugLog("nes_debug.log", std::ios::app);
+        debugLog << "Mapper 69 (Sunsoft FME-7) created successfully"
+                 << std::endl;
+        debugLog.close();
+      }
+      break;
     default:
       std::cerr << "Unsupported Mapper: " << (int)nMapperID << std::endl;
+      {
+        std::ofstream debugLog("nes_debug.log", std::ios::app);
+        debugLog << "UNSUPPORTED Mapper: " << (int)nMapperID << std::endl;
+        debugLog.close();
+      }
       pMapper = nullptr;
       bImageValid = false;
       ifs.close();
@@ -93,7 +128,7 @@ bool Cartridge::cpuRead(uint16_t addr, uint8_t &data) {
   uint32_t mapped_addr = 0;
   if (pMapper && pMapper->cpuMapRead(addr, mapped_addr)) {
     if (mapped_addr == 0xFFFFFFFF) {
-      // PRG RAM access
+      // PRG RAM or register access
       Mapper_001 *m1 = dynamic_cast<Mapper_001 *>(pMapper.get());
       if (m1) {
         data = m1->GetPRGRAM()[addr & 0x1FFF];
@@ -102,6 +137,25 @@ bool Cartridge::cpuRead(uint16_t addr, uint8_t &data) {
       Mapper_004 *m4 = dynamic_cast<Mapper_004 *>(pMapper.get());
       if (m4) {
         data = m4->GetPRGRAM()[addr & 0x1FFF];
+        return true;
+      }
+      Mapper_005 *m5 = dynamic_cast<Mapper_005 *>(pMapper.get());
+      if (m5) {
+        if (addr >= 0x5000 && addr <= 0x5FFF) {
+          // MMC5 register read
+          data = m5->ReadRegister(addr);
+        } else if (addr >= 0x6000 && addr <= 0x7FFF) {
+          // PRG RAM at $6000-$7FFF
+          data = m5->GetPRGRAM()[addr & 0x1FFF];
+        } else {
+          // PRG RAM mapped to $8000+ region
+          data = m5->GetPRGRAM()[addr & 0x1FFF];
+        }
+        return true;
+      }
+      Mapper_069 *m69 = dynamic_cast<Mapper_069 *>(pMapper.get());
+      if (m69) {
+        data = m69->GetPRGRAM()[addr & 0x1FFF];
         return true;
       }
       return true;
@@ -131,6 +185,9 @@ bool Cartridge::cpuWrite(uint16_t addr, uint8_t data) {
 
 bool Cartridge::ppuRead(uint16_t addr, uint8_t &data) {
   uint32_t mapped_addr = 0;
+  if (pMapper->ppuReadCustom(addr, data)) {
+    return true;
+  }
   if (pMapper && pMapper->ppuMapRead(addr, mapped_addr)) {
     if (mapped_addr < vCHRMemory.size()) {
       data = vCHRMemory[mapped_addr];
@@ -142,6 +199,9 @@ bool Cartridge::ppuRead(uint16_t addr, uint8_t &data) {
 
 bool Cartridge::ppuWrite(uint16_t addr, uint8_t data) {
   uint32_t mapped_addr = 0;
+  if (pMapper->ppuWriteCustom(addr, data)) {
+    return true;
+  }
   if (pMapper && pMapper->ppuMapWrite(addr, mapped_addr)) {
     if (mapped_addr < vCHRMemory.size()) {
       vCHRMemory[mapped_addr] = data;
