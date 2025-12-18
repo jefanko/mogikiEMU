@@ -38,7 +38,7 @@ This project provides a deep understanding of the NES hardware architecture, inc
 | **Super Mario Bros. 3 (MMC3)** | ⭐ Playable | Status bar works (IRQ), scrolling is smooth. |
 | **Kirby's Adventure (MMC3)** | ⚠️ Playable* | Playable, but has minor graphical artifacts (split screen timing issues). |
 | **Castlevania (UxROM)** | ⭐ Perfect | Fully playable. |
-| **Castlevania 3 (MMC5)** | ⭐ Playable | Fully supported with custom nametable mirroring/fill mode. |
+| **Castlevania 3 (MMC5)** | ⭐ Playable | Fully supported with custom nametable mirroring/fill mode. Major graphical glitch |
 
 ## Build Instructions
 
@@ -82,4 +82,5 @@ The emulator follows a bus-centric architecture similar to the real hardware:
 
 ## Known Issues
 - **Kirby's Adventure**: The split screen status bar sometimes glitches or shakes. This is due to the extreme precision required for A12-based IRQ timing when the game swaps pattern tables mid-frame. This is a common "holy grail" test for MMC3 accuracy.
+
 
