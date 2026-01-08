@@ -34,6 +34,8 @@ void Mapper_005::reset() {
   scanlineCounter = 0;
   lastPPUAddr = 0;
   matchCount = 0;
+  lastBgTileAddr = 0;
+  lastBgTileExRam = 0;
 
   mirrorMode = MIRROR::VERTICAL;
 
@@ -97,10 +99,7 @@ uint8_t Mapper_005::ReadRegister(uint16_t addr) {
     return (uint8_t)(((multiplierA * multiplierB) >> 8) & 0xFF);
   } else if (addr >= 0x5C00 && addr <= 0x5FFF) {
     // ExRAM read
-    if (exRamMode >= 2) {
-      return vExRAM[addr & 0x03FF];
-    }
-    return 0; // Open bus in other modes
+    return vExRAM[addr & 0x03FF];
   }
   return 0;
 }
@@ -403,6 +402,9 @@ bool Mapper_005::ppuMapRead(uint16_t addr, uint32_t &mapped_addr) {
 
       if (bg_fetches_remaining > 0) {
         // Background fetch detected -> Use $5128-$512B
+        if (exRamMode == 1) {
+          bankIndex = (lastBgTileExRam >> 2) & 0x03;
+        }
         bank = chrBankReg[8 + bankIndex];
         bg_fetches_remaining--;
       } else {
@@ -474,6 +476,17 @@ bool Mapper_005::ppuReadCustom(uint16_t addr, uint8_t &data) {
     uint8_t mode = (ntMapping >> (quadrant * 2)) & 0x03;
     uint16_t offset = tempAddr & 0x03FF;
 
+    if (exRamMode == 1) {
+      if (offset < 0x03C0) {
+        lastBgTileAddr = offset;
+        lastBgTileExRam = vExRAM[offset];
+      } else {
+        uint8_t palette = lastBgTileExRam & 0x03;
+        data = palette | (palette << 2) | (palette << 4) | (palette << 6);
+        return true;
+      }
+    }
+
     switch (mode) {
     case 0: // CIRAM Page 0
       data = internalNametable[0 + offset];
@@ -487,7 +500,8 @@ bool Mapper_005::ppuReadCustom(uint16_t addr, uint8_t &data) {
     case 3: // Fill Mode
       if (offset >= 0x03C0) {
         // Attribute Table
-        data = fillColor;
+        uint8_t palette = fillColor & 0x03;
+        data = palette | (palette << 2) | (palette << 4) | (palette << 6);
       } else {
         // Name Table
         data = fillTile;

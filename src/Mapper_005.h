@@ -80,6 +80,8 @@ private:
   // When a nametable read is detected, we expect 2 pattern table reads for
   // background
   int bg_fetches_remaining = 0;
+  uint16_t lastBgTileAddr = 0;
+  uint8_t lastBgTileExRam = 0;
 
   // Mirroring
   MIRROR mirrorMode = MIRROR::VERTICAL;
