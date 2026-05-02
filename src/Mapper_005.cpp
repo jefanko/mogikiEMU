@@ -403,9 +403,11 @@ bool Mapper_005::ppuMapRead(uint16_t addr, uint32_t &mapped_addr) {
       if (bg_fetches_remaining > 0) {
         // Background fetch detected -> Use $5128-$512B
         if (exRamMode == 1) {
-          bankIndex = (lastBgTileExRam >> 2) & 0x03;
+          // Extended attribute mode: ignore standard CHR banking, use ExRAM bits and $5130
+          bank = ((lastBgTileExRam & 0x3F) | (chrUpperBits << 6)) * 4 + bankIndex;
+        } else {
+          bank = chrBankReg[8 + bankIndex];
         }
-        bank = chrBankReg[8 + bankIndex];
         bg_fetches_remaining--;
       } else {
         // Sprite fetch (or unknown) -> Use $5120-$5127
