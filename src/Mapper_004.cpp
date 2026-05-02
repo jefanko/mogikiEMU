@@ -169,13 +169,17 @@ bool Mapper_004::ppuMapWrite(uint16_t addr, uint32_t &mapped_addr) {
 }
 
 void Mapper_004::scanline() {
-  if (nIRQCounter == 0 || bIRQUpdate) {
+  if (nIRQCounter == 0) {
     nIRQCounter = nIRQReload;
-    bIRQUpdate = false;
   } else {
     nIRQCounter--;
     if (nIRQCounter == 0 && bIRQEnable) {
       bIRQActive = true;
     }
+  }
+
+  if (bIRQUpdate) {
+    nIRQCounter = nIRQReload;
+    bIRQUpdate = false;
   }
 }
