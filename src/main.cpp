@@ -3,7 +3,7 @@
 #include "Config.h"
 #include "Display.h"
 #include "Platform.h"
-#include "include/SDL2/SDL.h"
+#include <SDL2/SDL.h>
 #include <atomic>
 #include <iostream>
 #include <memory>

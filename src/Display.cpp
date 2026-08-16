@@ -1,6 +1,6 @@
 #include "Display.h"
 #include "Platform.h"
-#include "include/SDL2/SDL_syswm.h"
+#include <SDL2/SDL_syswm.h>
 #include <iostream>
 
 #ifdef _WIN32

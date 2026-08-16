@@ -1,5 +1,5 @@
 #pragma once
-#include "include/SDL2/SDL.h"
+#include <SDL2/SDL.h>
 #include <cstdint>
 #include <fstream>
 #include <string>
