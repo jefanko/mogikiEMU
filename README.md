@@ -3,6 +3,12 @@
 <div align="center">
   <img src="mgkEMU.png" alt="Mogiki NES Emulator Icon" width="128" height="128" />
   <h3>A cycle-accurate, hardware-sensitive Nintendo Entertainment System (NES) emulator with a modern Avalonia UI.</h3>
+
+  <p>
+    <b>English</b> |
+    <a href="README.ja.md">日本語</a> |
+    <a href="README.zh-TW.md">繁體中文 (台灣)</a>
+  </p>
 </div>
 
 ---
