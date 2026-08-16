@@ -1,18 +1,12 @@
 @echo off
-echo Compiling resources...
-windres resources.rc -o resources.o
-
-echo Building mgkEMU...
-g++ -o mgkEMU src/*.cpp resources.o -lmingw32 -lSDL2main -lSDL2 -mwindows -lsetupapi -luser32 -lgdi32 -lwinmm -limm32 -lole32 -loleaut32 -lshell32 -lversion -luuid
+echo Building legacy C++ mgkEMU...
+g++ -O3 -IC:/msys64/ucrt64/include -LC:/msys64/ucrt64/lib -o mgkEMU_legacy.exe srcLegacy/*.cpp -lmingw32 -lSDL2main -lSDL2 -mwindows
 
 if %errorlevel% neq 0 (
     echo.
     echo Build failed!
-    pause
     exit /b %errorlevel%
 )
 
 echo.
-echo Build successful!
-del resources.o
-pause
+echo Build successful! (mgkEMU_legacy.exe)

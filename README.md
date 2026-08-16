@@ -1,86 +1,125 @@
-# mgkEMU
+# Mogiki NES Emulator (mgkEMU)
 
-![mgkEMU Icon](mgkEMU.png)
+<div align="center">
+  <img src="mgkEMU.png" alt="Mogiki NES Emulator Icon" width="128" height="128" />
+  <h3>A cycle-accurate, hardware-sensitive Nintendo Entertainment System (NES) emulator with a modern Avalonia UI.</h3>
+</div>
 
-**mgkEMU** (derived from **Mogiki** / 模擬器 - meaning "simulator") is a robust, cycle-accurate Nintendo Entertainment System (NES) emulator written in C++ using SDL2.
+---
 
-## Philosophy & Methodology
-The logic behind this project is to **emulate the hardware, not just the behavior**. By simulating the NES internal bus and component interactions cycle-by-cycle, we ensure that even hardware quirks and timing-sensitive tricks work natively.
+## 🌟 Overview
 
-This project provides a deep understanding of the NES hardware architecture, including the CPU (6502), PPU (2C02), APU (2A03), and various cartridge mappers.
+**Mogiki** (模擬器 - meaning *"simulator"* / *"emulator"*) is a cycle-sensitive Nintendo Entertainment System / Famicom emulator re-engineered in **C# (.NET 10)** featuring a modern, hardware-accelerated **Avalonia UI 11.x** interface.
 
+The core follows an **accuracy-first, bus-centric architecture**, simulating the internal bus interactions of the NES hardware cycle-by-cycle to ensure authentic gameplay, accurate audio synthesis, and split-screen raster timing.
 
-## Features
+---
 
-- **CPU**: Complete Ricoh 2A03 (6502 w/o decimal mode) emulation with cycle-accurate timing and full instruction set.
-- **PPU**: Cycle-accurate pixel rendering (2C02), supporting background scrolling, sprites (8x8 and 8x16), palette scanning, and accurate scanline timing.
-- **APU**: Full audio implementation featuring:
-  - 2 Pulse Channels (Square waves with sweep and envelope)
-  - 1 Triangle Channel (Linear counter)
-  - 1 Noise Channel (LFSR with envelope)
-  - 1 DMC Channel (Delta Modulation Channel for samples)
-  - Synchronization with CPU cycles.
-- **Mappers**: Support for the most common cartridge hardware:
-  - **Mapper 0 (NROM)**: *Super Mario Bros., Donkey Kong, Ice Climber*
-  - **Mapper 1 (MMC1)**: *Metroid, The Legend of Zelda* (Basic support)
-  - **Mapper 2 (UxROM)**: *Castlevania, Mega Man*
-  - **Mapper 4 (MMC3)**: *Super Mario Bros. 3, Kirby's Adventure* (Advanced IRQ support)
-  - **Mapper 5 (MMC5)**: *Castlevania 3: Dracula's Curse* (Advanced banking, shadow nametables, fill mode)
-- **Controls**: Keyboard input with configurable bindings.
-- **Save/Load**: Basic configuration saving.
+## ✨ Features
 
-## Compatibility Status
+### 🖥️ Modern Avalonia UI
+- **Dark Fluent Theme**: Clean modern aesthetics powered by `Avalonia.Themes.Fluent` with Inter typography and custom status pills.
+- **Hardware-Accelerated Viewport**: High-performance 60.1 FPS direct memory blitting via `WriteableBitmap`.
+- **Drag & Drop**: Drag any `.nes` ROM file from Windows Explorer directly onto the emulator window to launch immediately.
+- **Recent ROMs Menu**: Automatically tracks and remembers your last 10 games.
+- **Aspect Ratio Controls**:
+  - `4:3 Standard TV`
+  - `8:7 Authentic NTSC PAR`
+  - `1:1 Pixel Perfect`
+- **Video Filters**: Nearest-Neighbor (Crisp Pixels) or Smooth Bilinear filtering.
+- **In-App Screenshots**: Save PNG frame captures with `F12`.
+- **Interactive Modals**:
+  - **Controller Configuration**: Rebind buttons with live keyboard capture and default presets.
+  - **Pattern Table Viewer**: Real-time CHR ROM tile bank inspector with dynamic palette selection.
+  - **About Dialog**: Overview of the emulator architecture and hardware specifications.
 
-| Game | Status | Notes |
-|------|--------|-------|
-| **Super Mario Bros. (NROM)** | ⭐ Perfect | Runs at 60fps with correct audio and physics. |
-| **Donkey Kong (NROM)** | ⭐ Perfect | Fully playable. |
-| **Super Mario Bros. 3 (MMC3)** | ⭐ Playable | Status bar works (IRQ), scrolling is smooth. |
-| **Kirby's Adventure (MMC3)** | ⚠️ Playable* | Playable, but has minor graphical artifacts (split screen timing issues). |
-| **Castlevania (UxROM)** | ⭐ Perfect | Fully playable. |
-| **Castlevania 3 (MMC5)** | ⭐ Playable | Fully supported with custom nametable mirroring/fill mode. Major graphical glitch |
+### 🎮 Emulation Hardware Core (`Mogiki.Core`)
+- **Ricoh 2A03 CPU**: Full 6502 core with illegal/undocumented opcode support and unmanaged function pointer instruction dispatch.
+- **Ricoh 2C02 PPU**: Cycle-accurate pixel rendering pipeline, 8x8 / 8x16 sprites, sprite evaluation, PPUMASK left-clipping, and odd-frame cycle skip.
+- **APU 2A03**: Complete audio synthesis with 2 Pulse channels, Triangle channel, Noise channel (LFSR), DMC samples, and low-latency ring buffer.
+- **Supported Mappers**:
+  - **Mapper 0 (NROM)**: *Super Mario Bros., Donkey Kong, Pac-Man*
+  - **Mapper 1 (MMC1)**: *The Legend of Zelda, Metroid, Mega Man 2*
+  - **Mapper 2 (UxROM)**: *Castlevania, Mega Man, Duck Tales*
+  - **Mapper 4 (MMC3)**: *Super Mario Bros. 3, Kirby's Adventure* (Accurate scanline reload state machine & IRQ timing)
+  - **Mapper 5 (MMC5)**: *Castlevania III: Dracula's Curse* (Dual-bank 8x16 CHR, 1KB scanline IRQ, hardware multiplier)
+  - **Mapper 69 (Sunsoft FME-7)**: *Gimmick!, Batman: Return of the Joker*
 
-## Build Instructions
+---
+
+## 🕹️ Default Keyboard Controls
+
+| NES Button | Keyboard Key | Description |
+|:---|:---|:---|
+| **D-Pad Up** | `Up Arrow` | Move Up / Climb |
+| **D-Pad Down** | `Down Arrow` | Move Down / Crouch |
+| **D-Pad Left** | `Left Arrow` | Move Left |
+| **D-Pad Right** | `Right Arrow` | Move Right |
+| **A Button** | `X` | Jump / Action |
+| **B Button** | `Z` | Attack / Run |
+| **Start** | `S` | Start / Menu |
+| **Select** | `A` | Select / Item |
+| **Open ROM** | `Ctrl + O` / `F1` | Open file picker dialog |
+| **Pause / Resume** | `Space` / `P` | Pause emulation |
+| **Reset** | `Ctrl + R` | Reset system |
+| **Fast Forward** | `Tab` | Turbo speed |
+| **Screenshot** | `F12` | Save screenshot PNG |
+
+> *All controller keys can be customized via **Config $\rightarrow$ Controller Configuration...***
+
+---
+
+## 🚀 Getting Started & Building
 
 ### Prerequisites
-- **SDL2**: Development libraries are required.
-- **C++ Compiler**: C++17 capable compiler (g++, clang, MSVC).
+- [.NET 10 SDK](https://dotnet.microsoft.com/download)
 
-### Building (Command Line)
-To build with `g++` (e.g., MinGW on Windows or Linux):
+### Run with .NET CLI
+```powershell
+# Run the emulator
+dotnet run --project src/Mogiki.App
 
-```bash
-# Ensure SDL2 include/lib paths are set if not in standard locations
-g++ -o mgkEMU src/*.cpp -lmingw32 -lSDL2main -lSDL2
+# Or pass a ROM directly
+dotnet run --project src/Mogiki.App "path/to/game.nes"
 ```
 
-## Technical Architecture
+### Build & Publish Standalone Release
+```powershell
+dotnet publish src/Mogiki.App/Mogiki.App.csproj -c Release -o ./dist
+```
+The compiled executable will be located at `dist/Mogiki.App.exe`.
 
-The emulator follows a bus-centric architecture similar to the real hardware:
+### Run Automated Unit Tests
+```powershell
+dotnet test
+```
 
-- **Bus**: The central communication hub. Connects CPU, PPU, APU, and Cartridge. Handles memory mapping ($0000-$FFFF) and redirecting reads/writes.
-- **CPU6502**: Implements the fetch-decode-execute cycle. Handles official opcodes and mimics cycle counts.
-- **PPU2C02**: Renders the screen scanline by scanline. It runs at 3x the speed of the CPU (NTSC). Implements background fetch cycles, sprite evaluation, and pattern table lookups.
-- **APU2A03**: Generates audio samples. Runs at CPU speed. Uses a lock-free ring buffer to feed samples to SDL2's audio callback to prevent clicking/popping.
-- **Cartridge/Mappers**: Handling PRG/CHR bank switching. 
-  - *MMC3 Implementation*: Uses A12 line monitoring to clock the IRQ counter, essential for split-screen effects in games like SMB3 and Kirby.
+---
 
-## Controls
+## 🏛️ Project Architecture
 
-| NES Button | Keyboard Key |
-|------------|--------------|
-| **D-Pad** | Arrow Keys |
-| **A** | `X` |
-| **B** | `Z` |
-| **Start** | `S` |
-| **Select** | `A` |
-| **Open ROM** | `F1` |
-| **Pause** | `P` |
-| **Quit** | `ESC` |
+```
+mogikiEMU/
+├── src/
+│   ├── Mogiki.Core/          # Cross-platform emulation core (.NET 10)
+│   │   ├── Cpu/              # Ricoh 2A03 6502 CPU
+│   │   ├── Ppu/              # Ricoh 2C02 PPU & Loopy registers
+│   │   ├── Apu/              # 2A03 APU audio synthesis
+│   │   ├── Bus/              # Main interconnect & DMA
+│   │   ├── Cartridge/        # iNES loader
+│   │   └── Mappers/          # Mappers 0, 1, 2, 4, 5, 69
+│   └── Mogiki.App/           # Modern Avalonia UI frontend
+│       ├── Views/            # MainWindow, ControllerConfig, PatternTable, About
+│       ├── Audio/            # AudioEngine with low-pass filtering
+│       ├── Config/           # AppConfig & keybindings
+│       └── Assets/           # Application icons & branding
+├── tests/
+│   └── Mogiki.Tests/         # xUnit automated test suite
+├── srcLegacy/                # Original C++ reference implementation
+└── build.bat                 # Legacy C++ build script (mgkEMU_legacy.exe)
+```
 
+---
 
-
-## Known Issues
-- **Kirby's Adventure**: The split screen status bar sometimes glitches or shakes. This is due to the extreme precision required for A12-based IRQ timing when the game swaps pattern tables mid-frame. This is a common "holy grail" test for MMC3 accuracy.
-
-
+## 📜 License
+This project is open-source under the MIT License.

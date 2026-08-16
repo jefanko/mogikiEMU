@@ -1,0 +1,33 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Mogiki.App.Views.PatternTableWindow"
+        Title="Pattern Table (CHR ROM) Viewer"
+        Icon="/Assets/mgkEMU.png"
+        Width="560" Height="360"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#18181C">
+
+    <Grid RowDefinitions="Auto, *" Margin="20">
+        <!-- Palette Selection -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12" Margin="0,0,0,16">
+            <TextBlock Text="Palette:" VerticalAlignment="Center" Foreground="#E2E8F0" FontSize="13" />
+            <ComboBox x:Name="ComboPalette" Width="140" SelectionChanged="OnPaletteChanged">
+                <ComboBoxItem Content="Palette 0" />
+                <ComboBoxItem Content="Palette 1" />
+                <ComboBoxItem Content="Palette 2" />
+                <ComboBoxItem Content="Palette 3" />
+                <ComboBoxItem Content="Palette 4" />
+                <ComboBoxItem Content="Palette 5" />
+                <ComboBoxItem Content="Palette 6" />
+                <ComboBoxItem Content="Palette 7" />
+            </ComboBox>
+        </StackPanel>
+
+        <!-- Viewer Image -->
+        <Border Grid.Row="1" Background="Black" CornerRadius="8" BorderBrush="#33333E" BorderThickness="1" Padding="4">
+            <Image x:Name="ImgPattern" Width="512" Height="256" Stretch="Fill"
+                   RenderOptions.BitmapInterpolationMode="None" />
+        </Border>
+    </Grid>
+</Window>
