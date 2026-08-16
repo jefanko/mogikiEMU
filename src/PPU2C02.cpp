@@ -98,6 +98,7 @@ void PPU2C02::reset() {
   control.reg = 0x00;
   vram_addr.reg = 0x0000;
   tram_addr.reg = 0x0000;
+  odd_frame = false;
 }
 
 void PPU2C02::ConnectCartridge(const std::shared_ptr<Cartridge> &cartridge) {
@@ -384,7 +385,8 @@ void PPU2C02::clock() {
   };
 
   if (scanline >= -1 && scanline < 240) {
-    if (scanline == 0 && cycle == 0) {
+    if (scanline == 0 && cycle == 0 && odd_frame &&
+        (mask.render_background || mask.render_sprites)) {
       cycle = 1;
     }
 
@@ -442,6 +444,11 @@ void PPU2C02::clock() {
       TransferAddressX();
     }
 
+    // MMC5 scanline detection at cycle 4
+    if (cycle == 4 && scanline >= 0 && scanline < 240) {
+      if (cart) cart->Scanline(scanline, cycle);
+    }
+
     // MMC3 scanline counter - clocked when A12 rises from 0 to 1
     // MUST include pre-render scanline (-1) for correct counter behavior!
     if (scanline >= -1 && scanline < 240 &&
@@ -456,7 +463,7 @@ void PPU2C02::clock() {
       }
 
       if (cycle == clockCycle) {
-        cart->Scanline();
+        if (cart) cart->Scanline();
       }
     }
 
@@ -573,6 +580,8 @@ void PPU2C02::clock() {
       status.vertical_blank = 1;
       if (control.enable_nmi)
         nmi = true;
+      if (cart)
+        cart->Scanline(scanline, cycle);
     }
   }
 
@@ -581,14 +590,16 @@ void PPU2C02::clock() {
   uint8_t bg_palette = 0x00;
 
   if (mask.render_background) {
-    uint16_t bit_mux = 0x8000 >> fine_x;
-    uint8_t p0_pixel = (bg_shifter_pattern_lo & bit_mux) > 0;
-    uint8_t p1_pixel = (bg_shifter_pattern_hi & bit_mux) > 0;
-    bg_pixel = (p1_pixel << 1) | p0_pixel;
+    if (mask.render_background_left || cycle > 8) {
+      uint16_t bit_mux = 0x8000 >> fine_x;
+      uint8_t p0_pixel = (bg_shifter_pattern_lo & bit_mux) > 0;
+      uint8_t p1_pixel = (bg_shifter_pattern_hi & bit_mux) > 0;
+      bg_pixel = (p1_pixel << 1) | p0_pixel;
 
-    uint8_t bg_pal0 = (bg_shifter_attrib_lo & bit_mux) > 0;
-    uint8_t bg_pal1 = (bg_shifter_attrib_hi & bit_mux) > 0;
-    bg_palette = (bg_pal1 << 1) | bg_pal0;
+      uint8_t bg_pal0 = (bg_shifter_attrib_lo & bit_mux) > 0;
+      uint8_t bg_pal1 = (bg_shifter_attrib_hi & bit_mux) > 0;
+      bg_palette = (bg_pal1 << 1) | bg_pal0;
+    }
   }
 
   uint8_t fg_pixel = 0x00;
@@ -598,20 +609,22 @@ void PPU2C02::clock() {
   if (mask.render_sprites) {
     bSpriteZeroBeingRendered = false;
 
-    for (uint8_t i = 0; i < sprite_count; i++) {
-      if (spriteScanline[i].x == 0) {
-        uint8_t fg_pixel_lo = (sprite_shifter_pattern_lo[i] & 0x80) > 0;
-        uint8_t fg_pixel_hi = (sprite_shifter_pattern_hi[i] & 0x80) > 0;
-        fg_pixel = (fg_pixel_hi << 1) | fg_pixel_lo;
+    if (mask.render_sprites_left || cycle > 8) {
+      for (uint8_t i = 0; i < sprite_count; i++) {
+        if (spriteScanline[i].x == 0) {
+          uint8_t fg_pixel_lo = (sprite_shifter_pattern_lo[i] & 0x80) > 0;
+          uint8_t fg_pixel_hi = (sprite_shifter_pattern_hi[i] & 0x80) > 0;
+          fg_pixel = (fg_pixel_hi << 1) | fg_pixel_lo;
 
-        fg_palette = (spriteScanline[i].attribute & 0x03) + 0x04;
-        fg_priority = (spriteScanline[i].attribute & 0x20) == 0;
+          fg_palette = (spriteScanline[i].attribute & 0x03) + 0x04;
+          fg_priority = (spriteScanline[i].attribute & 0x20) == 0;
 
-        if (fg_pixel != 0) {
-          if (i == 0) {
-            bSpriteZeroBeingRendered = true;
+          if (fg_pixel != 0) {
+            if (i == 0) {
+              bSpriteZeroBeingRendered = true;
+            }
+            break;
           }
-          break;
         }
       }
     }
@@ -654,29 +667,6 @@ void PPU2C02::clock() {
   }
 
   if (scanline >= 0 && scanline < 240 && cycle >= 1 && cycle <= 256) {
-    // Edge clipping - hide leftmost and rightmost 8 pixels to simulate TV
-    // overscan and hide scrolling artifacts common in NES games (like SMB3/FF1)
-    if (cycle <= 8 || cycle >= 249) {
-      pixel = 0;
-      palette = 0;
-    } else if (cycle <= 8) {
-      // Fallback to hardware mask logic if we weren't forcing (sanity check)
-      if (!mask.render_background_left && bg_pixel > 0) {
-        bg_pixel = 0;
-        bg_palette = 0;
-      }
-      if (!mask.render_sprites_left && fg_pixel > 0) {
-        fg_pixel = 0;
-        fg_palette = 0;
-      }
-      // Re-evaluate pixel if we modified components (only if not forced zero
-      // above)
-      if (bg_pixel == 0 && fg_pixel == 0) {
-        pixel = 0;
-        palette = 0;
-      }
-    }
-
     screen[scanline * 256 + (cycle - 1)] =
         GetColorFromPaletteRam(palette, pixel);
   }
@@ -688,6 +678,7 @@ void PPU2C02::clock() {
     if (scanline >= 261) {
       scanline = -1;
       frame_complete = true;
+      odd_frame = !odd_frame;
     }
   }
 }

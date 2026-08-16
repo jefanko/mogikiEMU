@@ -51,15 +51,10 @@ void Bus::clock() {
         }
       }
     } else {
+      if (cart && cart->GetIRQState()) {
+        cpu.irq();
+      }
       cpu.clock();
-    }
-
-    // Check mapper IRQ (for MMC3) - Level Triggered
-    // If IRQ is asserted by mapper, we signal the CPU.
-    // The CPU handle the 'I' flag check and only interrupts on instruction
-    // boundaries.
-    if (cart->GetIRQState()) {
-      cpu.irq();
     }
   }
 
@@ -72,6 +67,10 @@ void Bus::clock() {
 }
 
 void Bus::write(uint16_t addr, uint8_t data) {
+  if (cart) {
+    cart->cpuSnoopWrite(addr, data);
+  }
+
   if (cart->cpuWrite(addr, data)) {
   } else if (addr >= 0x0000 && addr <= 0x1FFF) {
     ram[addr & 0x07FF] = data;
@@ -94,6 +93,10 @@ void Bus::write(uint16_t addr, uint8_t data) {
 }
 
 uint8_t Bus::read(uint16_t addr, bool bReadOnly) {
+  if (cart && (addr == 0xFFFA || addr == 0xFFFB)) {
+    cart->cpuSnoopRead(addr);
+  }
+
   uint8_t data = 0x00;
   if (cart->cpuRead(addr, data)) {
   } else if (addr >= 0x0000 && addr <= 0x1FFF) {

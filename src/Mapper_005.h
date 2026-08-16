@@ -13,6 +13,10 @@ public:
   bool ppuMapRead(uint16_t addr, uint32_t &mapped_addr) override;
   bool ppuMapWrite(uint16_t addr, uint32_t &mapped_addr) override;
 
+  // Snoop CPU bus writes/reads for PPU/DMA/NMI state
+  void cpuSnoopWrite(uint16_t addr, uint8_t data) override;
+  void cpuSnoopRead(uint16_t addr) override;
+
   // Custom PPU Read for Fill Mode / Complex Mirroring
   bool ppuReadCustom(uint16_t addr, uint8_t &data) override;
   bool ppuWriteCustom(uint16_t addr, uint8_t data) override;
@@ -24,9 +28,11 @@ public:
   bool irqState() override { return bIRQActive && bIRQEnable; }
   void irqClear() override { bIRQActive = false; }
   void scanline() override;
+  void scanline(int currentScanline, int currentCycle) override;
 
   // PRG RAM access
   std::vector<uint8_t> &GetPRGRAM() { return vPRGRAM; }
+  uint8_t ReadPRGRAM(uint16_t addr);
 
   // Internal register read (for CPU reads in $5000-$5FFF range)
   uint8_t ReadRegister(uint16_t addr);
@@ -54,12 +60,14 @@ private:
   uint16_t chrBankReg[12] = {0}; // $5120-$512B
   uint8_t chrUpperBits = 0;      // $5130
 
-  // Track which CHR bank set was last written (for 8x8 sprite mode)
+  // Track which CHR bank set was last written (for 8x8 sprite mode / PPUDATA)
   // true = upper half ($5128-$512B), false = lower half ($5120-$5127)
   bool lastCHRBankWriteIsUpperHalf = false;
 
-  // Track if we're in 8x16 sprite mode (read from PPU $2000)
+  // Track if we're in 8x16 sprite mode (read from PPU $2000 bit 5)
   bool bSprite8x16Mode = false;
+  // Track if rendering substitutions are enabled (read from PPU $2001 bits 3,4)
+  bool bRenderEnable = false;
 
   // Multiplier ($5205-$5206)
   uint8_t multiplierA = 0xFF;
@@ -77,8 +85,7 @@ private:
   uint8_t matchCount = 0;
 
   // For CHR bank switching (Sprite vs Background)
-  // When a nametable read is detected, we expect 2 pattern table reads for
-  // background
+  // When a nametable read is detected, we expect 2 pattern table reads for background
   int bg_fetches_remaining = 0;
   uint16_t lastBgTileAddr = 0;
   uint8_t lastBgTileExRam = 0;

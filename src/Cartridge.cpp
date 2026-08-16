@@ -144,12 +144,9 @@ bool Cartridge::cpuRead(uint16_t addr, uint8_t &data) {
         if (addr >= 0x5000 && addr <= 0x5FFF) {
           // MMC5 register read
           data = m5->ReadRegister(addr);
-        } else if (addr >= 0x6000 && addr <= 0x7FFF) {
-          // PRG RAM at $6000-$7FFF
-          data = m5->GetPRGRAM()[addr & 0x1FFF];
         } else {
-          // PRG RAM mapped to $8000+ region
-          data = m5->GetPRGRAM()[addr & 0x1FFF];
+          // PRG RAM mapped to $6000-$DFFF with banking
+          data = m5->ReadPRGRAM(addr);
         }
         return true;
       }

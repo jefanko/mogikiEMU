@@ -27,6 +27,10 @@ void Mapper_005::reset() {
   multiplierA = 0xFF;
   multiplierB = 0xFF;
 
+  bSprite8x16Mode = false;
+  bRenderEnable = false;
+  lastCHRBankWriteIsUpperHalf = false;
+
   irqScanline = 0;
   bIRQEnable = false;
   bIRQActive = false;
@@ -36,6 +40,7 @@ void Mapper_005::reset() {
   matchCount = 0;
   lastBgTileAddr = 0;
   lastBgTileExRam = 0;
+  bg_fetches_remaining = 0;
 
   mirrorMode = MIRROR::VERTICAL;
 
@@ -78,11 +83,42 @@ uint32_t Mapper_005::GetCHRBankOffset(int bank, int bankSize) {
 
 MIRROR Mapper_005::mirror() { return mirrorMode; }
 
+uint8_t Mapper_005::ReadPRGRAM(uint16_t addr) {
+  uint32_t ramAddr = 0;
+  if (addr >= 0x6000 && addr <= 0x7FFF) {
+    uint8_t bank = prgBankReg[0] & 0x07;
+    ramAddr = (bank * 8192) + (addr & 0x1FFF);
+  } else if (addr >= 0x8000 && addr < 0xE000) {
+    int regIndex = -1;
+    if (prgMode == 1 || prgMode == 2) {
+      if (addr < 0xC000) {
+        uint8_t bank = ((prgBankReg[2] & 0x06) | ((addr >> 13) & 1)) & 0x07;
+        ramAddr = (bank * 8192) + (addr & 0x1FFF);
+        if (ramAddr < vPRGRAM.size()) return vPRGRAM[ramAddr];
+      } else if (addr < 0xE000 && prgMode == 2) {
+        regIndex = 3;
+      }
+    } else if (prgMode == 3) {
+      if (addr < 0xA000) regIndex = 1;
+      else if (addr < 0xC000) regIndex = 2;
+      else if (addr < 0xE000) regIndex = 3;
+    }
+    if (regIndex >= 0) {
+      uint8_t bank = prgBankReg[regIndex] & 0x07;
+      ramAddr = (bank * 8192) + (addr & 0x1FFF);
+    }
+  }
+  if (ramAddr < vPRGRAM.size()) {
+    return vPRGRAM[ramAddr];
+  }
+  return 0;
+}
+
 uint8_t Mapper_005::ReadRegister(uint16_t addr) {
   if (addr == 0x5204) {
     // IRQ Status
-    // Bit 7: In-frame flag
-    // Bit 6: IRQ pending flag
+    // Bit 7: IRQ pending flag
+    // Bit 6: In-frame flag
     uint8_t status = 0;
     if (bInFrame)
       status |= 0x40;
@@ -98,10 +134,40 @@ uint8_t Mapper_005::ReadRegister(uint16_t addr) {
     // Multiplier result high byte
     return (uint8_t)(((multiplierA * multiplierB) >> 8) & 0xFF);
   } else if (addr >= 0x5C00 && addr <= 0x5FFF) {
-    // ExRAM read
-    return vExRAM[addr & 0x03FF];
+    // ExRAM read (only readable directly if exRamMode >= 2, open bus otherwise)
+    if (exRamMode >= 2) {
+      return vExRAM[addr & 0x03FF];
+    }
+    return 0;
   }
   return 0;
+}
+
+void Mapper_005::cpuSnoopWrite(uint16_t addr, uint8_t data) {
+  if (addr >= 0x2000 && addr <= 0x3FFF) {
+    uint16_t reg = addr & 0x0007;
+    if (reg == 0) {
+      // PPUCTRL ($2000) Bit 5: Sprite size (0: 8x8 pixels; 1: 8x16 pixels)
+      bSprite8x16Mode = (data & 0x20) != 0;
+    } else if (reg == 1) {
+      // PPUMASK ($2001) Bits 3,4: Render enable (substitutions enabled if either is set)
+      bool prevRender = bRenderEnable;
+      bRenderEnable = (data & 0x18) != 0;
+      if (!bRenderEnable && prevRender) {
+        bInFrame = false;
+        scanlineCounter = 0;
+      }
+    }
+  }
+}
+
+void Mapper_005::cpuSnoopRead(uint16_t addr) {
+  if (addr == 0xFFFA || addr == 0xFFFB) {
+    // NMI vector fetch: clears in-frame flag, acknowledges IRQ, resets counter
+    bInFrame = false;
+    scanlineCounter = 0;
+    bIRQActive = false;
+  }
 }
 
 bool Mapper_005::cpuMapRead(uint16_t addr, uint32_t &mapped_addr) {
@@ -113,7 +179,7 @@ bool Mapper_005::cpuMapRead(uint16_t addr, uint32_t &mapped_addr) {
 
   // $6000-$7FFF: PRG RAM (always 8KB bank via $5113)
   if (addr >= 0x6000 && addr <= 0x7FFF) {
-    mapped_addr = 0xFFFFFFFF; // PRG RAM handled separately
+    mapped_addr = 0xFFFFFFFF; // PRG RAM handled via ReadPRGRAM
     return true;
   }
 
@@ -265,7 +331,7 @@ bool Mapper_005::cpuMapWrite(uint16_t addr, uint32_t &mapped_addr,
     // CHR bank registers $5120-$512B
     else if (addr >= 0x5120 && addr <= 0x512B) {
       chrBankReg[addr - 0x5120] = data | (chrUpperBits << 8);
-      // Track which half was written (for 8x8 sprite mode)
+      // Track which half was written (for 8x8 sprite mode / PPUDATA)
       // $5120-$5127 = sprite banks, $5128-$512B = background banks
       lastCHRBankWriteIsUpperHalf = (addr >= 0x5128);
     } else if (addr == 0x5130) {
@@ -278,6 +344,9 @@ bool Mapper_005::cpuMapWrite(uint16_t addr, uint32_t &mapped_addr,
     // IRQ registers
     else if (addr == 0x5203) {
       irqScanline = data;
+      if (irqScanline > 0 && scanlineCounter == irqScanline) {
+        bIRQActive = true;
+      }
     } else if (addr == 0x5204) {
       bIRQEnable = (data & 0x80) != 0;
     }
@@ -289,11 +358,7 @@ bool Mapper_005::cpuMapWrite(uint16_t addr, uint32_t &mapped_addr,
     }
     // ExRAM writes $5C00-$5FFF
     else if (addr >= 0x5C00 && addr <= 0x5FFF) {
-      if (exRamMode <= 1) {
-        // Mode 0 or 1: writable during rendering
-        vExRAM[addr & 0x03FF] = data;
-      } else if (exRamMode == 2) {
-        // Mode 2: always writable
+      if (exRamMode <= 2) {
         vExRAM[addr & 0x03FF] = data;
       }
       // Mode 3: read-only
@@ -318,6 +383,17 @@ bool Mapper_005::cpuMapWrite(uint16_t addr, uint32_t &mapped_addr,
   // $8000-$DFFF: Can write to PRG RAM if mapped
   if (addr >= 0x8000 && addr < 0xE000) {
     if (IsPRGRAMEnabled()) {
+      if (prgMode == 1 || prgMode == 2) {
+        if (addr < 0xC000 && !(prgBankReg[2] & 0x80)) {
+          uint8_t bank = ((prgBankReg[2] & 0x06) | ((addr >> 13) & 1)) & 0x07;
+          uint32_t ramAddr = (bank * 8192) + (addr & 0x1FFF);
+          if (ramAddr < vPRGRAM.size()) {
+            vPRGRAM[ramAddr] = data;
+          }
+          mapped_addr = 0xFFFFFFFF;
+          return true;
+        }
+      }
       int regIndex = -1;
       if (prgMode == 2) {
         if (addr >= 0xC000 && addr < 0xE000) {
@@ -349,17 +425,6 @@ bool Mapper_005::cpuMapWrite(uint16_t addr, uint32_t &mapped_addr,
 }
 
 bool Mapper_005::ppuMapRead(uint16_t addr, uint32_t &mapped_addr) {
-  // PPU Fetch Monitoring Logic
-  // The PPU fetches NT, AT, PT Low, PT High for each background tile
-  // If we see an Attribute Table read ($23C0-$23FF, etc.), we expect the next 2
-  // PT reads to be for background We strictly check for AT because the PPU does
-  // a dummy NT read at cycle 340 which messes up sprite fetching
-  if (addr >= 0x2000 && addr <= 0x3FFF) {
-    if ((addr & 0x03FF) >= 0x03C0) {
-      bg_fetches_remaining = 2; // Next 2 PT reads are for background
-    }
-  }
-
   // Pattern table $0000-$1FFF
   if (addr < 0x2000) {
     uint32_t bank = 0;
@@ -367,41 +432,67 @@ bool Mapper_005::ppuMapRead(uint16_t addr, uint32_t &mapped_addr) {
     if (chrRomSize == 0)
       chrRomSize = 8192; // CHR RAM
 
+    // NESdev: Independent 8x16 sprite / background CHR banks are ONLY active when
+    // 8x16 sprite mode is enabled ($2000 bit 5) AND rendering substitutions are enabled ($2001 bits 3,4 non-zero).
+    bool bDualBankActive = bSprite8x16Mode && bRenderEnable;
+
     switch (chrMode) {
     case 0: // 8KB
-      bank = chrBankReg[7];
+      if (bDualBankActive && bg_fetches_remaining > 0) {
+        bank = chrBankReg[11];
+        bg_fetches_remaining--;
+      } else if (!bRenderEnable && lastCHRBankWriteIsUpperHalf) {
+        bank = chrBankReg[11];
+      } else {
+        bank = chrBankReg[7];
+        if (bg_fetches_remaining > 0) bg_fetches_remaining--;
+      }
       mapped_addr = ((bank * 8192) + addr) % chrRomSize;
       break;
 
     case 1: // 4KB
-      if (addr < 0x1000) {
-        bank = chrBankReg[3];
+      if (bDualBankActive && bg_fetches_remaining > 0) {
+        if (exRamMode == 1) {
+          bank = (lastBgTileExRam & 0x3F) | (chrUpperBits << 6);
+        } else {
+          bank = chrBankReg[11];
+        }
+        bg_fetches_remaining--;
+      } else if (!bRenderEnable && lastCHRBankWriteIsUpperHalf) {
+        bank = chrBankReg[11];
       } else {
-        bank = chrBankReg[7];
+        bank = (addr < 0x1000) ? chrBankReg[3] : chrBankReg[7];
+        if (bg_fetches_remaining > 0) bg_fetches_remaining--;
       }
       mapped_addr = ((bank * 4096) + (addr & 0x0FFF)) % chrRomSize;
       break;
 
     case 2: // 2KB
-      if (addr < 0x0800) {
-        bank = chrBankReg[1];
-      } else if (addr < 0x1000) {
-        bank = chrBankReg[3];
-      } else if (addr < 0x1800) {
-        bank = chrBankReg[5];
+      if (bDualBankActive && bg_fetches_remaining > 0) {
+        if (exRamMode == 1) {
+          bank = ((lastBgTileExRam & 0x3F) | (chrUpperBits << 6)) * 2 + ((addr >> 11) & 0x01);
+        } else {
+          bank = (addr < 0x0800 || (addr >= 0x1000 && addr < 0x1800)) ? chrBankReg[9] : chrBankReg[11];
+        }
+        bg_fetches_remaining--;
+      } else if (!bRenderEnable && lastCHRBankWriteIsUpperHalf) {
+        bank = (addr < 0x0800 || (addr >= 0x1000 && addr < 0x1800)) ? chrBankReg[9] : chrBankReg[11];
       } else {
-        bank = chrBankReg[7];
+        if (addr < 0x0800) bank = chrBankReg[1];
+        else if (addr < 0x1000) bank = chrBankReg[3];
+        else if (addr < 0x1800) bank = chrBankReg[5];
+        else bank = chrBankReg[7];
+        if (bg_fetches_remaining > 0) bg_fetches_remaining--;
       }
       mapped_addr = ((bank * 2048) + (addr & 0x07FF)) % chrRomSize;
       break;
 
-    case 3: // 1KB (most common for games)
+    case 3: // 1KB (most common for games, used by Castlevania 3)
     default: {
-      // Dynamic bank selection based on fetch state
       int bankIndex = (addr >> 10) & 0x03; // 0-3 within the 4KB page
 
-      if (bg_fetches_remaining > 0) {
-        // Background fetch detected -> Use $5128-$512B
+      if (bDualBankActive && bg_fetches_remaining > 0) {
+        // Background fetch in 8x16 sprite mode -> use $5128-$512B
         if (exRamMode == 1) {
           // Extended attribute mode: ignore standard CHR banking, use ExRAM bits and $5130
           bank = ((lastBgTileExRam & 0x3F) | (chrUpperBits << 6)) * 4 + bankIndex;
@@ -409,12 +500,16 @@ bool Mapper_005::ppuMapRead(uint16_t addr, uint32_t &mapped_addr) {
           bank = chrBankReg[8 + bankIndex];
         }
         bg_fetches_remaining--;
+      } else if (!bRenderEnable && lastCHRBankWriteIsUpperHalf) {
+        // PPUDATA access outside rendering after writing to upper half ($5128-$512B)
+        bank = chrBankReg[8 + bankIndex];
       } else {
-        // Sprite fetch (or unknown) -> Use $5120-$5127
-        // In 1KB mode, sprite banks are 0-7, effectively using the lower
-        // registers
+        // 8x8 sprite mode (both BG and sprites), OR sprite fetch in 8x16 mode, OR standard PPUDATA access
         int wideIndex = (addr >> 10) & 0x07;
         bank = chrBankReg[wideIndex];
+        if (bg_fetches_remaining > 0) {
+          bg_fetches_remaining--;
+        }
       }
 
       mapped_addr = ((bank * 1024) + (addr & 0x03FF)) % chrRomSize;
@@ -497,7 +592,7 @@ bool Mapper_005::ppuReadCustom(uint16_t addr, uint8_t &data) {
       data = internalNametable[1024 + offset];
       return true;
     case 2: // Extended RAM
-      data = vExRAM[offset];
+      data = (exRamMode >= 2) ? 0 : vExRAM[offset];
       return true;
     case 3: // Fill Mode
       if (offset >= 0x03C0) {
@@ -515,24 +610,29 @@ bool Mapper_005::ppuReadCustom(uint16_t addr, uint8_t &data) {
 }
 
 void Mapper_005::scanline() {
-  // This is called by the PPU on each scanline
-  // The MMC5 has its own scanline detection, but we use this as a fallback
+  // Handled cycle-accurately in scanline(int scanline, int cycle)
+}
 
-  if (!bInFrame) {
-    bInFrame = true;
-    scanlineCounter = 0;
-  } else {
-    scanlineCounter++;
+void Mapper_005::scanline(int scanline, int cycle) {
+  // NESdev: MMC5 scanline detection happens at cycle 4 of visible scanlines (0..239)
+  // when rendering is enabled (bRenderEnable).
+  if (cycle == 4 && scanline >= 0 && scanline < 240 && bRenderEnable) {
+    if (scanline == 0 || !bInFrame) {
+      bInFrame = true;
+      scanlineCounter = 0;
+      bIRQActive = false; // Scanline 0 acknowledges IRQ
+    } else {
+      scanlineCounter++;
+      if (scanlineCounter == irqScanline && irqScanline > 0) {
+        bIRQActive = true;
+      }
+    }
   }
 
-  // Compare with target scanline
-  if (scanlineCounter == irqScanline && irqScanline > 0) {
-    bIRQActive = true;
-  }
-
-  // Reset at end of visible frame
-  if (scanlineCounter >= 240) {
+  // End of visible frame / VBlank at scanline 241
+  if (scanline == 241 && cycle == 1) {
     bInFrame = false;
     scanlineCounter = 0;
+    bIRQActive = false;
   }
 }

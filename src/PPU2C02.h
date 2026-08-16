@@ -137,4 +137,5 @@ private: // Registers
 
   bool bSpriteZeroHitPossible = false;
   bool bSpriteZeroBeingRendered = false;
+  bool odd_frame = false;
 };

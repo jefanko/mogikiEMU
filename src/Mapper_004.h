@@ -17,7 +17,7 @@ public:
   MIRROR mirror() override { return mirrorMode; }
 
   // IRQ interface
-  bool irqState() override { return bIRQActive; }
+  bool irqState() override { return bIRQActive && bIRQEnable; }
   void irqClear() override { bIRQActive = false; }
 
   // Scanline counter
@@ -46,4 +46,6 @@ private:
 
   // PRG RAM
   std::vector<uint8_t> vRAMStatic;
+
+  void UpdateBanks();
 };

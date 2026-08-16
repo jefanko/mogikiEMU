@@ -31,12 +31,18 @@ public:
   // Get current mirroring mode
   virtual MIRROR mirror() { return MIRROR::HORIZONTAL; }
 
+  // Snoop CPU bus writes/reads (for mappers like MMC5 that monitor PPU/DMA/NMI registers)
+  virtual void cpuSnoopWrite(uint16_t addr, uint8_t data) {}
+  virtual void cpuSnoopRead(uint16_t addr) {}
+
   // IRQ interface (for mappers like MMC3)
   virtual bool irqState() { return false; }
   virtual void irqClear() {}
   virtual void scanline() {}
+  virtual void scanline(int currentScanline, int currentCycle) {}
 
 protected:
   uint8_t nPRGBanks = 0;
   uint8_t nCHRBanks = 0;
 };
+

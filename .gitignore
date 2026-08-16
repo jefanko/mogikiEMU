@@ -1,0 +1,8 @@
+## Rules & IDE
+.agentic
+.agents/
+
+## Executables & Build Artifacts
+*.exe
+*.zip
+*.o

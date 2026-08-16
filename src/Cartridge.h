@@ -26,6 +26,16 @@ public:
     return MIRROR::HORIZONTAL;
   }
 
+  // Snoop CPU bus writes/reads (for mappers like MMC5)
+  void cpuSnoopWrite(uint16_t addr, uint8_t data) {
+    if (pMapper)
+      pMapper->cpuSnoopWrite(addr, data);
+  }
+  void cpuSnoopRead(uint16_t addr) {
+    if (pMapper)
+      pMapper->cpuSnoopRead(addr);
+  }
+
   // IRQ interface (forwarded to mapper)
   bool GetIRQState() {
     if (pMapper)
@@ -39,6 +49,10 @@ public:
   void Scanline() {
     if (pMapper)
       pMapper->scanline();
+  }
+  void Scanline(int currentScanline, int currentCycle) {
+    if (pMapper)
+      pMapper->scanline(currentScanline, currentCycle);
   }
 
 private:

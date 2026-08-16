@@ -565,18 +565,65 @@ void CPU6502::clock()
 {
     if (cycles == 0)
     {
-        opcode = read(pc);
-        SetFlag(U, true);
-        pc++;
+        bool bIRQAsserted = (bus && ((bus->cart && bus->cart->GetIRQState()) || bus->apu.GetIRQ()));
+        if (bNMIPending)
+        {
+            bNMIPending = false;
+            write(0x0100 + sp, (pc >> 8) & 0x00FF);
+            sp--;
+            write(0x0100 + sp, pc & 0x00FF);
+            sp--;
 
-        cycles = lookup[opcode].cycles;
+            // Push status with B=0 and U=1, preserving original I flag
+            uint8_t status_to_push = (st & ~B) | U;
+            write(0x0100 + sp, status_to_push);
+            sp--;
 
-        uint8_t additional_cycle1 = (this->*lookup[opcode].addrmode)();
-        uint8_t additional_cycle2 = (this->*lookup[opcode].operate)();
+            SetFlag(I, true);
 
-        cycles += (additional_cycle1 & additional_cycle2);
+            addr_abs = 0xFFFA;
+            uint16_t lo = read(addr_abs + 0);
+            uint16_t hi = read(addr_abs + 1);
+            pc = (hi << 8) | lo;
 
-        SetFlag(U, true);
+            cycles = 8;
+        }
+        else if (bIRQAsserted && GetFlag(I) == 0)
+        {
+            write(0x0100 + sp, (pc >> 8) & 0x00FF);
+            sp--;
+            write(0x0100 + sp, pc & 0x00FF);
+            sp--;
+
+            // Push status with B=0 and U=1, preserving original I flag
+            uint8_t status_to_push = (st & ~B) | U;
+            write(0x0100 + sp, status_to_push);
+            sp--;
+
+            SetFlag(I, true);
+
+            addr_abs = 0xFFFE;
+            uint16_t lo = read(addr_abs + 0);
+            uint16_t hi = read(addr_abs + 1);
+            pc = (hi << 8) | lo;
+
+            cycles = 7;
+        }
+        else
+        {
+            opcode = read(pc);
+            SetFlag(U, true);
+            pc++;
+
+            cycles = lookup[opcode].cycles;
+
+            uint8_t additional_cycle1 = (this->*lookup[opcode].addrmode)();
+            uint8_t additional_cycle2 = (this->*lookup[opcode].operate)();
+
+            cycles += (additional_cycle1 & additional_cycle2);
+
+            SetFlag(U, true);
+        }
     }
 
     clock_count++;
@@ -588,7 +635,7 @@ void CPU6502::reset()
     a = 0;
     x = 0;
     y = 0;
-    st = 0x00 | U;
+    st = 0x00 | U | I;
     sp = 0xFD;
 
     addr_abs = 0xFFFC;
@@ -600,53 +647,21 @@ void CPU6502::reset()
     addr_abs = 0x0000;
     fetched = 0x00;
 
+    bNMIPending = false;
+
     cycles = 8;
 }
 
 void CPU6502::irq()
 {
-    if (GetFlag(I) == 0)
-    {
-        write(0x0100 + sp, (pc >> 8) & 0x00FF);
-        sp--;
-        write(0x0100 + sp, pc & 0x00FF);
-        sp--;
-
-        SetFlag(B, false);
-        SetFlag(U, true);
-        SetFlag(I, true);
-        write(0x0100 + sp, st);
-        sp--;
-
-        addr_abs = 0xFFFE;
-        uint16_t lo = read(addr_abs + 0);
-        uint16_t hi = read(addr_abs + 1);
-        pc = (hi << 8) | lo;
-
-        cycles = 7;
-    }
+    // Level triggered via bus->cart->GetIRQState()
 }
 
 void CPU6502::nmi()
 {
-    write(0x0100 + sp, (pc >> 8) & 0x00FF);
-    sp--;
-    write(0x0100 + sp, pc & 0x00FF);
-    sp--;
-
-    SetFlag(B, false);
-    SetFlag(U, true);
-    SetFlag(I, true);
-    write(0x0100 + sp, st);
-    sp--;
-
-    addr_abs = 0xFFFA;
-    uint16_t lo = read(addr_abs + 0);
-    uint16_t hi = read(addr_abs + 1);
-    pc = (hi << 8) | lo;
-
-    cycles = 8;
+    bNMIPending = true;
 }
+
 
 // Instruction: Arithmetic Shift Left
 uint8_t CPU6502::ASL()
@@ -841,16 +856,16 @@ uint8_t CPU6502::BRK()
 {
     pc++;
 
-    SetFlag(I, true);
     write(0x0100 + sp, (pc >> 8) & 0x00FF);
     sp--;
     write(0x0100 + sp, pc & 0x00FF);
     sp--;
 
-    SetFlag(B, true);
-    write(0x0100 + sp, st);
+    uint8_t status_to_push = st | B | U;
+    write(0x0100 + sp, status_to_push);
     sp--;
-    SetFlag(B, false);
+
+    SetFlag(I, true);
 
     pc = (uint16_t)read(0xFFFE) | ((uint16_t)read(0xFFFF) << 8);
     return 0;

@@ -46,6 +46,8 @@ public:
     uint8_t  cycles = 0;        // Counts how many cycles the instruction has remaining
     uint32_t clock_count = 0;   // A global accumulation of the number of clocks
 
+    bool bNMIPending = false;
+
     uint8_t GetFlag(FLAGS6502 f);
     void    SetFlag(FLAGS6502 f, bool v);
 
