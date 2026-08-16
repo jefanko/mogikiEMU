@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Mogiki.App/Mogiki.App.csproj" />
+    <Project Path="src/Mogiki.Core/Mogiki.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Mogiki.Tests/Mogiki.Tests.csproj" />
+  </Folder>
+</Solution>

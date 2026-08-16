@@ -1,8 +1,31 @@
 ## Rules & IDE
 .agentic
 .agents/
+.vs/
+.vscode/
+.idea/
 
-## Executables & Build Artifacts
+## .NET & Build Output
+bin/
+obj/
+dist/
+TestResults/
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+
+## Compiled Binaries & Artifacts
 *.exe
+*.dll
+*.pdb
 *.zip
 *.o
+*.a
+*.lib
+*.so
+*.dylib
+
+## Config & Cache
+config.ini
+screenshot_*.png

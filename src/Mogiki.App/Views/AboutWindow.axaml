@@ -1,0 +1,41 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Mogiki.App.Views.AboutWindow"
+        Title="About Mogiki NES Emulator"
+        Icon="/Assets/mgkEMU.png"
+        Width="460" Height="330"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#18181C"
+        ExtendClientAreaToDecorationsHint="True">
+    
+    <Grid RowDefinitions="Auto, *, Auto" Margin="24">
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="16">
+            <Image Source="/Assets/mgkEMU.png" Width="48" Height="48" VerticalAlignment="Center" />
+            <StackPanel VerticalAlignment="Center" Spacing="2">
+                <TextBlock Text="Mogiki NES" FontSize="22" FontWeight="Bold" Foreground="#38BDF8" />
+                <TextBlock Text="Version 2.0 • Modern Avalonia Edition" FontSize="12" Foreground="#94A3B8" />
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Body -->
+        <Border Grid.Row="1" Margin="0,16,0,16" Padding="16" Background="#222228" CornerRadius="8" BorderBrush="#33333E" BorderThickness="1">
+            <StackPanel Spacing="8">
+                <TextBlock Text="A cycle-accurate, hardware-sensitive NES / Famicom emulator re-engineered in C# with Avalonia UI."
+                           TextWrapping="Wrap" Foreground="#E2E8F0" FontSize="13" />
+                <TextBlock Text="Hardware Support:" FontWeight="SemiBold" Foreground="#F8FAFC" FontSize="13" Margin="0,4,0,0" />
+                <TextBlock Text="• Ricoh 2A03 CPU (6502 core with illegal opcodes support)" Foreground="#CBD5E1" FontSize="12" />
+                <TextBlock Text="• Ricoh 2C02 PPU (Cycle-accurate rendering &amp; sprite evaluation)" Foreground="#CBD5E1" FontSize="12" />
+                <TextBlock Text="• APU 2A03 (Pulse 1/2, Triangle, Noise, DMC channels)" Foreground="#CBD5E1" FontSize="12" />
+                <TextBlock Text="• Mappers 0 (NROM), 1 (MMC1), 2 (UxROM), 4 (MMC3), 5 (MMC5), 69 (Sunsoft FME-7)" Foreground="#CBD5E1" FontSize="12" />
+            </StackPanel>
+        </Border>
+
+        <!-- Footer -->
+        <Button Grid.Row="2" Content="Close" HorizontalAlignment="Right" Width="90" Height="34"
+                HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                Background="#0284C7" Foreground="White" CornerRadius="6"
+                Click="OnCloseClick" />
+    </Grid>
+</Window>

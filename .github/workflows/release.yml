@@ -1,10 +1,12 @@
-name: Build and Release mgkEMU
+name: Build and Release Mogiki NES Emulator
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, csharp-experimental ]
     tags:
       - 'v*'
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -12,14 +14,22 @@ permissions:
 
 jobs:
   build:
-    name: Build Windows x64 Executable
+    name: Build & Test Mogiki NES
     runs-on: windows-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup MSYS2 (UCRT64)
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run Automated Unit Tests
+        run: dotnet test --configuration Release --verbosity normal
+
+      - name: Setup MSYS2 (for Legacy C++ Oracle Build)
         uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
@@ -29,31 +39,38 @@ jobs:
             mingw-w64-ucrt-x86_64-SDL2
             zip
 
-      - name: Compile mgkEMU
+      - name: Compile Legacy C++ Oracle
         shell: msys2 {0}
         run: |
-          g++ -O3 -o mgkEMU.exe src/*.cpp \
+          g++ -O3 -o mgkEMU_legacy.exe srcLegacy/*.cpp \
             -lmingw32 -lSDL2main -lSDL2 -mwindows \
             -static-libgcc -static-libstdc++
+
+      - name: Publish Modern C# Avalonia Release
+        run: |
+          dotnet publish src/Mogiki.App/Mogiki.App.csproj -c Release -o ./publish
 
       - name: Package Release ZIP
         shell: msys2 {0}
         run: |
-          # Copy SDL2 runtime DLL from MSYS2 ucrt64 bin
-          cp /ucrt64/bin/SDL2.dll ./
+          # Copy legacy oracle binary and documentation into publish folder
+          cp mgkEMU_legacy.exe ./publish/
+          cp README.md LICENSE mgkEMU.png ./publish/ 2>/dev/null || true
           
-          # Create zip containing executable, dll, and docs
-          zip -9 mgkEMU-windows-x64.zip mgkEMU.exe SDL2.dll README.md LICENSE
+          # Create release archive
+          cd publish
+          zip -9 -r ../Mogiki-NES-windows-x64.zip *
+          cd ..
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mgkEMU-windows-x64
-          path: mgkEMU-windows-x64.zip
+          name: Mogiki-NES-windows-x64
+          path: Mogiki-NES-windows-x64.zip
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: mgkEMU-windows-x64.zip
+          files: Mogiki-NES-windows-x64.zip
           generate_release_notes: true

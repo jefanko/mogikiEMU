@@ -1,0 +1,118 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Mogiki.App.Views.MainWindow"
+        Title="Mogiki NES Emulator"
+        Icon="/Assets/mgkEMU.png"
+        Width="960" Height="760"
+        MinWidth="512" MinHeight="480"
+        WindowStartupLocation="CenterScreen"
+        Background="#121215"
+        DragDrop.AllowDrop="True"
+        KeyDown="OnKeyDownHandler"
+        KeyUp="OnKeyUpHandler">
+
+    <Grid RowDefinitions="Auto, *, Auto">
+        <!-- Modern Menu Bar -->
+        <Border Grid.Row="0" Background="#1C1C22" BorderBrush="#2A2A34" BorderThickness="0,0,0,1">
+            <Menu>
+                <!-- File Menu -->
+                <MenuItem Header="_File">
+                    <MenuItem Header="_Open ROM..." InputGesture="Ctrl+O" Click="OnOpenRomClick" />
+                    <MenuItem Header="Recent _ROMs" x:Name="MenuRecentRoms" />
+                    <Separator />
+                    <MenuItem Header="Take _Screenshot" InputGesture="F12" Click="OnTakeScreenshotClick" />
+                    <Separator />
+                    <MenuItem Header="E_xit" InputGesture="Alt+F4" Click="OnExitClick" />
+                </MenuItem>
+
+                <!-- Emulation Menu -->
+                <MenuItem Header="_Emulation">
+                    <MenuItem Header="_Pause / Resume" InputGesture="Space" Click="OnTogglePauseClick" />
+                    <MenuItem Header="_Reset" InputGesture="Ctrl+R" Click="OnResetClick" />
+                </MenuItem>
+
+                <!-- Video Menu -->
+                <MenuItem Header="_Video">
+                    <MenuItem Header="Window Scale">
+                        <MenuItem Header="1x (256x240)" Click="OnScale1xClick" />
+                        <MenuItem Header="2x (512x480)" Click="OnScale2xClick" />
+                        <MenuItem Header="3x (768x720)" Click="OnScale3xClick" />
+                        <MenuItem Header="4x (1024x960)" Click="OnScale4xClick" />
+                    </MenuItem>
+                    <MenuItem Header="Aspect Ratio">
+                        <MenuItem Header="4:3 Standard TV" Click="OnAspect4_3Click" />
+                        <MenuItem Header="8:7 Authentic NTSC" Click="OnAspect8_7Click" />
+                        <MenuItem Header="1:1 Pixel Perfect" Click="OnAspect1_1Click" />
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem Header="Smooth Bilinear Filter" x:Name="MenuBilinearFilter" Click="OnToggleBilinearClick" />
+                </MenuItem>
+
+                <!-- Audio Menu -->
+                <MenuItem Header="_Audio">
+                    <MenuItem Header="Enable Sound" x:Name="MenuSoundEnabled" Click="OnToggleSoundClick" />
+                </MenuItem>
+
+                <!-- Config Menu -->
+                <MenuItem Header="_Config">
+                    <MenuItem Header="Controller Configuration..." Click="OnControllerConfigClick" />
+                </MenuItem>
+
+                <!-- Tools Menu -->
+                <MenuItem Header="_Tools">
+                    <MenuItem Header="Pattern Table Viewer..." Click="OnPatternTableClick" />
+                </MenuItem>
+
+                <!-- Help Menu -->
+                <MenuItem Header="_Help">
+                    <MenuItem Header="About Mogiki..." Click="OnAboutClick" />
+                </MenuItem>
+            </Menu>
+        </Border>
+
+        <!-- Emulation Viewport Area -->
+        <Grid Grid.Row="1" Background="#0A0A0C">
+            <!-- Game Canvas Display -->
+            <Viewbox x:Name="GameViewbox" Stretch="Uniform">
+                <Border Background="Black">
+                    <Image x:Name="GameScreen" Width="256" Height="240"
+                           RenderOptions.BitmapInterpolationMode="None" />
+                </Border>
+            </Viewbox>
+
+            <!-- Idle Welcome Overlay -->
+            <Border x:Name="WelcomeOverlay" Background="#121216" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" IsVisible="True">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16">
+                    <Image Source="/Assets/mgkEMU.png" Width="96" Height="96" HorizontalAlignment="Center" />
+                    <TextBlock Text="Mogiki NES Emulator" FontSize="26" FontWeight="Bold" Foreground="#F8FAFC" HorizontalAlignment="Center" />
+                    <TextBlock Text="Drag &amp; Drop a .nes ROM here or click Open to play" FontSize="14" Foreground="#94A3B8" HorizontalAlignment="Center" />
+                    
+                    <Button Content="Open ROM (Ctrl+O)" HorizontalAlignment="Center" Padding="20,10"
+                            Background="#0284C7" Foreground="White" FontWeight="SemiBold" CornerRadius="8"
+                            Click="OnOpenRomClick" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- Modern Status Bar -->
+        <Border Grid.Row="2" Background="#16161A" BorderBrush="#2A2A34" BorderThickness="0,1,0,0" Padding="12,6">
+            <Grid ColumnDefinitions="Auto, Auto, *, Auto">
+                <!-- Status Badge -->
+                <Border Grid.Column="0" x:Name="StatusPill" Background="#1E293B" CornerRadius="12" Padding="8,2" Margin="0,0,12,0">
+                    <TextBlock x:Name="TxtStatus" Text="No ROM Loaded" FontSize="11" FontWeight="SemiBold" Foreground="#94A3B8" />
+                </Border>
+
+                <!-- FPS Pill -->
+                <Border Grid.Column="1" Background="#0F172A" CornerRadius="12" Padding="8,2" Margin="0,0,12,0">
+                    <TextBlock x:Name="TxtFps" Text="0.0 FPS" FontSize="11" FontWeight="Bold" Foreground="#38BDF8" />
+                </Border>
+
+                <!-- Game Title / Info -->
+                <TextBlock Grid.Column="2" x:Name="TxtRomInfo" Text="" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+
+                <!-- Audio Status -->
+                <TextBlock Grid.Column="3" x:Name="TxtAudioInfo" Text="44.1 kHz" FontSize="11" Foreground="#64748B" VerticalAlignment="Center" />
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
