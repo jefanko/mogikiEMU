@@ -1,124 +1,172 @@
-using System.Runtime.InteropServices;
 using Mogiki.App.Interop;
 
 namespace Mogiki.App.Audio;
 
+/// <summary>
+/// Low-latency mono audio output backed by an SDL3 audio stream.
+/// SDL3 owns the device-side buffering and format conversion; Mogiki feeds
+/// small batches of emulator-generated float samples into the stream.
+/// </summary>
 public sealed unsafe class AudioEngine : IDisposable
 {
-    private const int AudioBufferSize = 32768;
-    private readonly float[] _audioBuffer = new float[AudioBufferSize];
-    private volatile int _writePos;
-    private volatile int _readPos;
+    private const int AudioBatchSize = 512;
+    private const int MaxQueuedSamples = 8192;
 
-    private uint _audioDevice;
-    private readonly SDL2.SDL_AudioCallback _callbackDelegate;
-    private GCHandle _callbackHandle;
+    private readonly float[] _pendingSamples = new float[AudioBatchSize];
+    private readonly object _streamLock = new();
+    private nint _audioStream;
+    private bool _sdlInitialized;
+    private int _pendingCount;
 
     public int SampleRate { get; private set; } = 44100;
-
-    public AudioEngine()
-    {
-        _callbackDelegate = AudioCallback;
-        _callbackHandle = GCHandle.Alloc(_callbackDelegate);
-    }
+    public bool IsAvailable => _audioStream != 0;
 
     public bool Init()
     {
-        SDL2.SDL_Init(SDL2.SDL_INIT_AUDIO);
-
-        var desired = new SDL2.SDL_AudioSpec
+        try
         {
-            freq = 44100,
-            format = SDL2.AUDIO_F32SYS,
-            channels = 1,
-            samples = 1024,
-            callback = Marshal.GetFunctionPointerForDelegate(_callbackDelegate),
-            userdata = nint.Zero
-        };
+            if (!SDL3.SDL_Init(SDL3.SDL_INIT_AUDIO))
+            {
+                Console.Error.WriteLine("SDL3 audio initialization failed.");
+                return false;
+            }
 
-        var obtained = new SDL2.SDL_AudioSpec();
-        _audioDevice = SDL2.SDL_OpenAudioDevice(null, 0, &desired, &obtained, SDL2.SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
+            _sdlInitialized = true;
 
-        if (_audioDevice == 0)
+            var desired = new SDL3.SDL_AudioSpec
+            {
+                format = SDL3.SDL_AUDIO_F32,
+                channels = 1,
+                freq = SampleRate
+            };
+
+            _audioStream = SDL3.SDL_OpenAudioDeviceStream(
+                SDL3.SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,
+                ref desired,
+                nint.Zero,
+                nint.Zero);
+
+            if (_audioStream == 0)
+            {
+                Console.Error.WriteLine("SDL3 audio stream creation failed.");
+                return false;
+            }
+
+            if (!SDL3.SDL_ResumeAudioStreamDevice(_audioStream))
+            {
+                Console.Error.WriteLine("SDL3 audio device could not be resumed.");
+                SDL3.SDL_DestroyAudioStream(_audioStream);
+                _audioStream = 0;
+                return false;
+            }
+
+            return true;
+        }
+        catch (DllNotFoundException ex)
         {
-            return false;
+            Console.Error.WriteLine($"SDL3.dll was not found: {ex.Message}");
+        }
+        catch (EntryPointNotFoundException ex)
+        {
+            Console.Error.WriteLine($"The installed SDL3.dll is incompatible: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"SDL3 audio initialization failed: {ex.Message}");
         }
 
-        SampleRate = obtained.freq;
-        SDL2.SDL_PauseAudioDevice(_audioDevice, 0); // Start playback
-        return true;
+        return false;
     }
 
     public void Pause(bool pause)
     {
-        if (_audioDevice != 0)
+        if (_audioStream == 0)
+            return;
+
+        lock (_streamLock)
         {
-            SDL2.SDL_PauseAudioDevice(_audioDevice, pause ? 1 : 0);
+            FlushPendingSamples();
+
+            if (pause)
+            {
+                SDL3.SDL_PauseAudioStreamDevice(_audioStream);
+            }
+            else
+            {
+                SDL3.SDL_ResumeAudioStreamDevice(_audioStream);
+            }
         }
     }
 
     public void Reset()
     {
-        _writePos = 0;
-        _readPos = 0;
-        Array.Clear(_audioBuffer, 0, _audioBuffer.Length);
+        lock (_streamLock)
+        {
+            _pendingCount = 0;
+            if (_audioStream != 0)
+            {
+                SDL3.SDL_ClearAudioStream(_audioStream);
+            }
+        }
     }
 
     public void WriteSample(float sample)
     {
-        int write = _writePos;
-        int read = _readPos;
+        if (_audioStream == 0)
+            return;
 
-        // Keep buffer bounded (~100ms max latency) to prevent delay buildup
-        if (write - read > 8192)
+        lock (_streamLock)
         {
-            _readPos = write - 4096;
-            read = _readPos;
-        }
-
-        if (write - read < AudioBufferSize - 1)
-        {
-            _audioBuffer[write % AudioBufferSize] = sample;
-            _writePos = write + 1;
+            _pendingSamples[_pendingCount++] = sample;
+            if (_pendingCount == _pendingSamples.Length)
+            {
+                FlushPendingSamples();
+            }
         }
     }
 
-    private void AudioCallback(nint userdata, byte* stream, int len)
+    private void FlushPendingSamples()
     {
-        float* output = (float*)stream;
-        int samples = len / sizeof(float);
+        if (_audioStream == 0 || _pendingCount == 0)
+            return;
 
-        int read = _readPos;
-        int write = _writePos;
-
-        for (int i = 0; i < samples; i++)
+        // Keep fast-forward mode from building an unbounded SDL stream.
+        if (SDL3.SDL_GetAudioStreamQueued(_audioStream) > MaxQueuedSamples * sizeof(float))
         {
-            if (read < write)
+            SDL3.SDL_ClearAudioStream(_audioStream);
+        }
+
+        fixed (float* samples = _pendingSamples)
+        {
+            if (!SDL3.SDL_PutAudioStreamData(
+                    _audioStream,
+                    samples,
+                    _pendingCount * sizeof(float)))
             {
-                output[i] = _audioBuffer[read % AudioBufferSize];
-                read++;
-            }
-            else
-            {
-                // Buffer underrun: gently decay last sample to eliminate clicking
-                output[i] = i > 0 ? output[i - 1] * 0.95f : 0.0f;
+                Console.Error.WriteLine("SDL3 rejected an audio sample batch.");
             }
         }
 
-        _readPos = read;
+        _pendingCount = 0;
     }
 
     public void Dispose()
     {
-        if (_audioDevice != 0)
+        lock (_streamLock)
         {
-            SDL2.SDL_CloseAudioDevice(_audioDevice);
-            _audioDevice = 0;
-        }
+            _pendingCount = 0;
 
-        if (_callbackHandle.IsAllocated)
-        {
-            _callbackHandle.Free();
+            if (_audioStream != 0)
+            {
+                SDL3.SDL_DestroyAudioStream(_audioStream);
+                _audioStream = 0;
+            }
+
+            if (_sdlInitialized)
+            {
+                SDL3.SDL_QuitSubSystem(SDL3.SDL_INIT_AUDIO);
+                _sdlInitialized = false;
+            }
         }
     }
 }

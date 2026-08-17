@@ -3,115 +3,189 @@
         x:Class="Mogiki.App.Views.MainWindow"
         Title="Mogiki NES Emulator"
         Icon="/Assets/mgkEMU.png"
-        Width="960" Height="760"
-        MinWidth="512" MinHeight="480"
+        Width="1200" Height="760"
+        MinWidth="860" MinHeight="560"
         WindowStartupLocation="CenterScreen"
-        Background="#121215"
+        Background="{DynamicResource AppBackgroundBrush}"
         DragDrop.AllowDrop="True"
         KeyDown="OnKeyDownHandler"
         KeyUp="OnKeyUpHandler">
 
-    <Grid RowDefinitions="Auto, *, Auto">
-        <!-- Modern Menu Bar -->
-        <Border Grid.Row="0" Background="#1C1C22" BorderBrush="#2A2A34" BorderThickness="0,0,0,1">
-            <Menu>
-                <!-- File Menu -->
-                <MenuItem Header="_File">
-                    <MenuItem Header="_Open ROM..." InputGesture="Ctrl+O" Click="OnOpenRomClick" />
-                    <MenuItem Header="Recent _ROMs" x:Name="MenuRecentRoms" />
-                    <Separator />
-                    <MenuItem Header="Take _Screenshot" InputGesture="F12" Click="OnTakeScreenshotClick" />
-                    <Separator />
-                    <MenuItem Header="E_xit" InputGesture="Alt+F4" Click="OnExitClick" />
-                </MenuItem>
+    <Grid RowDefinitions="64,*,34">
+        <!-- Ryujinx-inspired application header -->
+        <Border Grid.Row="0" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="22,0">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" VerticalAlignment="Center">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <Border Width="32" Height="32" CornerRadius="8" Background="{DynamicResource AccentBrush}">
+                        <Image Source="/Assets/mgkEMU.png" Width="23" Height="23" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel VerticalAlignment="Center" Spacing="0">
+                        <TextBlock Text="MOGIKI" FontSize="14" FontWeight="Bold" />
+                        <TextBlock Text="NES EMULATOR" Classes="eyebrow" FontSize="9" />
+                    </StackPanel>
+                </StackPanel>
 
-                <!-- Emulation Menu -->
-                <MenuItem Header="_Emulation">
-                    <MenuItem Header="_Pause / Resume" InputGesture="Space" Click="OnTogglePauseClick" />
-                    <MenuItem Header="_Reset" InputGesture="Ctrl+R" Click="OnResetClick" />
-                </MenuItem>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="16,0,12,0">
+                    <Button Content="Add Games Folder" Click="OnChooseLibraryClick" />
+                    <Button Content="Pause" Click="OnTogglePauseClick" />
+                    <Button Content="Reset" Click="OnResetClick" />
+                    <Button Classes="stop" Content="Stop" Click="OnStopClick" />
+                    <Button Content="Fullscreen" Click="OnToggleFullscreenClick" />
+                </StackPanel>
 
-                <!-- Video Menu -->
-                <MenuItem Header="_Video">
-                    <MenuItem Header="Window Scale">
-                        <MenuItem Header="1x (256x240)" Click="OnScale1xClick" />
-                        <MenuItem Header="2x (512x480)" Click="OnScale2xClick" />
-                        <MenuItem Header="3x (768x720)" Click="OnScale3xClick" />
-                        <MenuItem Header="4x (1024x960)" Click="OnScale4xClick" />
-                    </MenuItem>
-                    <MenuItem Header="Aspect Ratio">
-                        <MenuItem Header="4:3 Standard TV" Click="OnAspect4_3Click" />
-                        <MenuItem Header="8:7 Authentic NTSC" Click="OnAspect8_7Click" />
-                        <MenuItem Header="1:1 Pixel Perfect" Click="OnAspect1_1Click" />
-                    </MenuItem>
-                    <Separator />
-                    <MenuItem Header="Smooth Bilinear Filter" x:Name="MenuBilinearFilter" Click="OnToggleBilinearClick" />
-                </MenuItem>
-
-                <!-- Audio Menu -->
-                <MenuItem Header="_Audio">
-                    <MenuItem Header="Enable Sound" x:Name="MenuSoundEnabled" Click="OnToggleSoundClick" />
-                </MenuItem>
-
-                <!-- Config Menu -->
-                <MenuItem Header="_Config">
-                    <MenuItem Header="Controller Configuration..." Click="OnControllerConfigClick" />
-                </MenuItem>
-
-                <!-- Tools Menu -->
-                <MenuItem Header="_Tools">
-                    <MenuItem Header="Pattern Table Viewer..." Click="OnPatternTableClick" />
-                </MenuItem>
-
-                <!-- Help Menu -->
-                <MenuItem Header="_Help">
-                    <MenuItem Header="About Mogiki..." Click="OnAboutClick" />
-                </MenuItem>
-            </Menu>
+                <Button Grid.Column="3" Classes="primary" Content="Open ROM" Click="OnOpenRomClick" />
+            </Grid>
         </Border>
 
-        <!-- Emulation Viewport Area -->
-        <Grid Grid.Row="1" Background="#0A0A0C">
-            <!-- Game Canvas Display -->
-            <Viewbox x:Name="GameViewbox" Stretch="Uniform">
-                <Border Background="Black">
-                    <Image x:Name="GameScreen" Width="256" Height="240"
-                           RenderOptions.BitmapInterpolationMode="None" />
-                </Border>
-            </Viewbox>
+        <Grid Grid.Row="1" ColumnDefinitions="220,*">
+            <!-- Navigation rail -->
+            <Border Grid.Column="0" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0" Padding="14,20">
+                <Grid RowDefinitions="Auto,*,Auto">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="LIBRARY" Classes="eyebrow" Margin="10,0,0,8" />
+                        <Button Classes="navButton selected" Content="▦   Game Library" Click="OnChooseLibraryClick" />
+                        <Button Classes="navButton" Content="◷   Recent Games" />
+                    </StackPanel>
 
-            <!-- Idle Welcome Overlay -->
-            <Border x:Name="WelcomeOverlay" Background="#121216" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" IsVisible="True">
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16">
-                    <Image Source="/Assets/mgkEMU.png" Width="96" Height="96" HorizontalAlignment="Center" />
-                    <TextBlock Text="Mogiki NES Emulator" FontSize="26" FontWeight="Bold" Foreground="#F8FAFC" HorizontalAlignment="Center" />
-                    <TextBlock Text="Drag &amp; Drop a .nes ROM here or click Open to play" FontSize="14" Foreground="#94A3B8" HorizontalAlignment="Center" />
-                    
-                    <Button Content="Open ROM (Ctrl+O)" HorizontalAlignment="Center" Padding="20,10"
-                            Background="#0284C7" Foreground="White" FontWeight="SemiBold" CornerRadius="8"
-                            Click="OnOpenRomClick" />
-                </StackPanel>
+                    <StackPanel Grid.Row="2" Spacing="4">
+                        <TextBlock Text="TOOLS" Classes="eyebrow" Margin="10,0,0,8" />
+                        <Button Classes="navButton" Content="⚙   Controller Setup" Click="OnControllerConfigClick" />
+                        <Button Classes="navButton" Content="▧   Pattern Viewer" Click="OnPatternTableClick" />
+                        <Button Classes="navButton" Content="ⓘ   About Mogiki" Click="OnAboutClick" />
+                    </StackPanel>
+                </Grid>
             </Border>
+
+            <!-- Library and emulation surface -->
+            <Grid Grid.Column="1" RowDefinitions="Auto,*" Margin="28,22,28,18">
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                    <StackPanel Spacing="3">
+                        <TextBlock Text="GAME LIBRARY" Classes="eyebrow" />
+                        <TextBlock Text="Your NES collection" FontSize="24" FontWeight="SemiBold" />
+                    </StackPanel>
+
+                    <!-- Keep the full menu available without letting it dominate the shell. -->
+                    <Menu Grid.Column="1" VerticalAlignment="Center">
+                        <MenuItem Header="File">
+                            <MenuItem Header="Open ROM..." InputGesture="Ctrl+O" Click="OnOpenRomClick" />
+                            <MenuItem Header="Add Games Folder..." Click="OnChooseLibraryClick" />
+                            <MenuItem Header="Recent ROMs" x:Name="MenuRecentRoms" />
+                            <Separator />
+                            <MenuItem Header="Take Screenshot" InputGesture="F12" Click="OnTakeScreenshotClick" />
+                            <Separator />
+                            <MenuItem Header="Exit" InputGesture="Alt+F4" Click="OnExitClick" />
+                        </MenuItem>
+                        <MenuItem Header="Emulation">
+                            <MenuItem Header="Pause / Resume" InputGesture="Space" Click="OnTogglePauseClick" />
+                            <MenuItem Header="Reset" InputGesture="Ctrl+R" Click="OnResetClick" />
+                            <MenuItem Header="Stop / Return to Library" InputGesture="Escape" Click="OnStopClick" />
+                        </MenuItem>
+                        <MenuItem Header="Video">
+                            <MenuItem Header="Window Scale">
+                                <MenuItem Header="1x (256x240)" Click="OnScale1xClick" />
+                                <MenuItem Header="2x (512x480)" Click="OnScale2xClick" />
+                                <MenuItem Header="3x (768x720)" Click="OnScale3xClick" />
+                                <MenuItem Header="4x (1024x960)" Click="OnScale4xClick" />
+                            </MenuItem>
+                            <MenuItem Header="Aspect Ratio">
+                                <MenuItem Header="4:3 Standard TV" Click="OnAspect4_3Click" />
+                                <MenuItem Header="8:7 Authentic NTSC" Click="OnAspect8_7Click" />
+                                <MenuItem Header="1:1 Pixel Perfect" Click="OnAspect1_1Click" />
+                            </MenuItem>
+                            <MenuItem Header="Fullscreen" InputGesture="F11" Click="OnToggleFullscreenClick" />
+                            <Separator />
+                            <MenuItem Header="Smooth Bilinear Filter" x:Name="MenuBilinearFilter" Click="OnToggleBilinearClick" />
+                        </MenuItem>
+                        <MenuItem Header="Audio">
+                            <MenuItem Header="Enable Sound" x:Name="MenuSoundEnabled" Click="OnToggleSoundClick" />
+                        </MenuItem>
+                        <MenuItem Header="Help">
+                            <MenuItem Header="Controller Configuration..." Click="OnControllerConfigClick" />
+                            <MenuItem Header="About Mogiki..." Click="OnAboutClick" />
+                        </MenuItem>
+                    </Menu>
+                </Grid>
+
+                <Grid Grid.Row="1" Margin="0,18,0,0">
+                    <!-- Game Canvas Display -->
+                    <Border Background="#08090B" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="16">
+                        <Viewbox x:Name="GameViewbox" Stretch="Uniform" IsVisible="False">
+                            <Border Background="Black">
+                                <Image x:Name="GameScreen" Width="256" Height="240"
+                                       RenderOptions.BitmapInterpolationMode="None" />
+                            </Border>
+                        </Viewbox>
+                    </Border>
+
+                    <!-- The actual game is rendered in a separate GameWindow. -->
+                    <Border x:Name="DetachedGameOverlay"
+                            Background="{DynamicResource SurfaceBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            IsVisible="False">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+                            <TextBlock Text="GAME WINDOW ACTIVE" Classes="eyebrow" HorizontalAlignment="Center" />
+                            <TextBlock Text="Your game is running in a separate window."
+                                       FontSize="20"
+                                       FontWeight="SemiBold"
+                                       HorizontalAlignment="Center" />
+                            <TextBlock Text="Use F11 for fullscreen or Stop to return to the library."
+                                       Classes="muted"
+                                       FontSize="12"
+                                       HorizontalAlignment="Center" />
+                            <Button Classes="stop"
+                                    Content="Stop and return to library"
+                                    HorizontalAlignment="Center"
+                                    Margin="0,8,0,0"
+                                    Click="OnStopClick" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Launcher/library state shown until a game is selected -->
+                    <Border x:Name="WelcomeOverlay" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" IsVisible="True">
+                        <Grid Margin="24">
+                            <Border MaxWidth="720" Height="300" HorizontalAlignment="Center" VerticalAlignment="Center" Background="#1B1E23" BorderBrush="#3A2A25" BorderThickness="1" CornerRadius="12" Padding="24">
+                                <Grid ColumnDefinitions="*,260">
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="12">
+                                        <Border Width="58" Height="58" CornerRadius="14" Background="{DynamicResource AccentMutedBrush}">
+                                            <Image Source="/Assets/mgkEMU.png" Width="40" Height="40" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <TextBlock Text="Ready to play" FontSize="24" FontWeight="SemiBold" />
+                                        <TextBlock Text="Choose a game from your recent list or open a new .nes file."
+                                                   Classes="muted" FontSize="13" TextWrapping="Wrap" />
+                                        <Button Classes="primary" Content="Open ROM  -  Ctrl+O" HorizontalAlignment="Left" Margin="0,4,0,0" Click="OnOpenRomClick" />
+                                    </StackPanel>
+
+                                    <Border Grid.Column="1" Margin="24,0,0,0" Background="{DynamicResource SurfaceRaisedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14">
+                                        <StackPanel Spacing="10">
+                                            <TextBlock Text="LIBRARY" Classes="eyebrow" />
+                                            <TextBlock x:Name="LibraryDirectoryText" Text="No game folder selected" Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock x:Name="LibraryEmptyText" Text="Choose Add Games Folder to build your library." Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                                            <ScrollViewer MaxHeight="210">
+                                                <StackPanel x:Name="LibraryGamesPanel" Spacing="6" />
+                                            </ScrollViewer>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
         </Grid>
 
-        <!-- Modern Status Bar -->
-        <Border Grid.Row="2" Background="#16161A" BorderBrush="#2A2A34" BorderThickness="0,1,0,0" Padding="12,6">
-            <Grid ColumnDefinitions="Auto, Auto, *, Auto">
-                <!-- Status Badge -->
-                <Border Grid.Column="0" x:Name="StatusPill" Background="#1E293B" CornerRadius="12" Padding="8,2" Margin="0,0,12,0">
-                    <TextBlock x:Name="TxtStatus" Text="No ROM Loaded" FontSize="11" FontWeight="SemiBold" Foreground="#94A3B8" />
+        <!-- Compact emulator status strip -->
+        <Border Grid.Row="2" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="18,0">
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto" VerticalAlignment="Center">
+                <Border Grid.Column="0" x:Name="StatusPill" Background="{DynamicResource SurfaceRaisedBrush}" CornerRadius="4" Padding="8,3" Margin="0,0,10,0">
+                    <TextBlock x:Name="TxtStatus" Text="NO ROM LOADED" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource MutedTextBrush}" />
                 </Border>
-
-                <!-- FPS Pill -->
-                <Border Grid.Column="1" Background="#0F172A" CornerRadius="12" Padding="8,2" Margin="0,0,12,0">
-                    <TextBlock x:Name="TxtFps" Text="0.0 FPS" FontSize="11" FontWeight="Bold" Foreground="#38BDF8" />
+                <Border Grid.Column="1" Background="#18231F" CornerRadius="4" Padding="8,3" Margin="0,0,14,0">
+                    <TextBlock x:Name="TxtFps" Text="0.0 FPS" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}" />
                 </Border>
-
-                <!-- Game Title / Info -->
-                <TextBlock Grid.Column="2" x:Name="TxtRomInfo" Text="" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
-
-                <!-- Audio Status -->
-                <TextBlock Grid.Column="3" x:Name="TxtAudioInfo" Text="44.1 kHz" FontSize="11" Foreground="#64748B" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="2" x:Name="TxtRomInfo" Text="Open a ROM to begin" Classes="muted" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="3" x:Name="TxtAudioInfo" Text="44.1 kHz  |  AUDIO" Classes="muted" FontSize="10" VerticalAlignment="Center" />
             </Grid>
         </Border>
     </Grid>

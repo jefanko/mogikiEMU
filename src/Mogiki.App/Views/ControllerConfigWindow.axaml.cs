@@ -35,14 +35,14 @@ public partial class ControllerConfigWindow : Window
         BtnStart.Content = _bindings.Start.ToString();
         BtnSelect.Content = _bindings.Select.ToString();
 
-        BtnUp.Background = new SolidColorBrush(Color.Parse("#2D2D36"));
-        BtnDown.Background = new SolidColorBrush(Color.Parse("#2D2D36"));
-        BtnLeft.Background = new SolidColorBrush(Color.Parse("#2D2D36"));
-        BtnRight.Background = new SolidColorBrush(Color.Parse("#2D2D36"));
-        BtnA.Background = new SolidColorBrush(Color.Parse("#2D2D36"));
-        BtnB.Background = new SolidColorBrush(Color.Parse("#2D2D36"));
-        BtnStart.Background = new SolidColorBrush(Color.Parse("#2D2D36"));
-        BtnSelect.Background = new SolidColorBrush(Color.Parse("#2D2D36"));
+        BtnUp.Background = new SolidColorBrush(Color.Parse("#202329"));
+        BtnDown.Background = new SolidColorBrush(Color.Parse("#202329"));
+        BtnLeft.Background = new SolidColorBrush(Color.Parse("#202329"));
+        BtnRight.Background = new SolidColorBrush(Color.Parse("#202329"));
+        BtnA.Background = new SolidColorBrush(Color.Parse("#202329"));
+        BtnB.Background = new SolidColorBrush(Color.Parse("#202329"));
+        BtnStart.Background = new SolidColorBrush(Color.Parse("#202329"));
+        BtnSelect.Background = new SolidColorBrush(Color.Parse("#202329"));
     }
 
     private void OnKeyButtonClick(object? sender, RoutedEventArgs e)
@@ -53,7 +53,7 @@ public partial class ControllerConfigWindow : Window
             _activeButton = btn;
             _activeAction = action;
             btn.Content = "<Press Key>";
-            btn.Background = new SolidColorBrush(Color.Parse("#0284C7"));
+            btn.Background = new SolidColorBrush(Color.Parse("#EE7448"));
         }
     }
 

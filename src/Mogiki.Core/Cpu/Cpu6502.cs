@@ -730,6 +730,109 @@ public sealed unsafe class Cpu6502
     private static byte NOP(Cpu6502 c) => 1;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static byte LAX(Cpu6502 c)
+    {
+        c.Fetch();
+        c.A = c.Fetched;
+        c.X = c.Fetched;
+        c.SetFlag(Flags.Z, c.Fetched == 0);
+        c.SetFlag(Flags.N, (c.Fetched & 0x80) != 0);
+        return 1;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static byte SAX(Cpu6502 c)
+    {
+        c.Write(c.AddrAbs, (byte)(c.A & c.X));
+        return 0;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static byte DCP(Cpu6502 c)
+    {
+        c.Fetch();
+        byte value = (byte)(c.Fetched - 1);
+        c.Write(c.AddrAbs, value);
+        c.SetFlag(Flags.Z, value == c.A);
+        c.SetFlag(Flags.C, c.A >= value);
+        c.SetFlag(Flags.N, ((c.A - value) & 0x80) != 0);
+        return 0;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static byte ISC(Cpu6502 c)
+    {
+        c.Fetch();
+        byte value = (byte)(c.Fetched + 1);
+        c.Write(c.AddrAbs, value);
+        ushort temp = (ushort)(c.A + (value ^ 0xFF) + c.GetFlag(Flags.C));
+        c.SetFlag(Flags.C, (temp & 0xFF00) != 0);
+        c.SetFlag(Flags.Z, (temp & 0x00FF) == 0);
+        c.SetFlag(Flags.N, (temp & 0x80) != 0);
+        c.SetFlag(Flags.V, ((temp ^ c.A) & (temp ^ (value ^ 0xFF)) & 0x0080) != 0);
+        c.A = (byte)temp;
+        return 0;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static byte SLO(Cpu6502 c)
+    {
+        c.Fetch();
+        ushort value = (ushort)(c.Fetched << 1);
+        c.SetFlag(Flags.C, (value & 0xFF00) != 0);
+        byte result = (byte)value;
+        c.Write(c.AddrAbs, result);
+        c.A |= result;
+        c.SetFlag(Flags.Z, c.A == 0);
+        c.SetFlag(Flags.N, (c.A & 0x80) != 0);
+        return 0;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static byte RLA(Cpu6502 c)
+    {
+        c.Fetch();
+        ushort value = (ushort)((c.Fetched << 1) | c.GetFlag(Flags.C));
+        c.SetFlag(Flags.C, (value & 0xFF00) != 0);
+        byte result = (byte)value;
+        c.Write(c.AddrAbs, result);
+        c.A &= result;
+        c.SetFlag(Flags.Z, c.A == 0);
+        c.SetFlag(Flags.N, (c.A & 0x80) != 0);
+        return 0;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static byte SRE(Cpu6502 c)
+    {
+        c.Fetch();
+        c.SetFlag(Flags.C, (c.Fetched & 0x01) != 0);
+        byte result = (byte)(c.Fetched >> 1);
+        c.Write(c.AddrAbs, result);
+        c.A ^= result;
+        c.SetFlag(Flags.Z, c.A == 0);
+        c.SetFlag(Flags.N, (c.A & 0x80) != 0);
+        return 0;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static byte RRA(Cpu6502 c)
+    {
+        c.Fetch();
+        bool carryIn = c.GetFlag(Flags.C) != 0;
+        c.SetFlag(Flags.C, (c.Fetched & 0x01) != 0);
+        byte result = (byte)((c.Fetched >> 1) | (carryIn ? 0x80 : 0));
+        c.Write(c.AddrAbs, result);
+        ushort temp = (ushort)(c.A + result + c.GetFlag(Flags.C));
+        c.SetFlag(Flags.C, temp > 255);
+        c.SetFlag(Flags.Z, (temp & 0x00FF) == 0);
+        c.SetFlag(Flags.N, (temp & 0x80) != 0);
+        c.SetFlag(Flags.V, (~(c.A ^ result) & (c.A ^ temp) & 0x0080) != 0);
+        c.A = (byte)temp;
+        return 0;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static byte PHA(Cpu6502 c)
     {
         c.Write((ushort)(0x0100 + c.Sp), c.A);
@@ -761,6 +864,7 @@ public sealed unsafe class Cpu6502
         c.Sp++;
         c.St = c.Read((ushort)(0x0100 + c.Sp));
         c.SetFlag(Flags.U, true);
+        c.SetFlag(Flags.B, false);
         return 0;
     }
 
@@ -874,45 +978,45 @@ public sealed unsafe class Cpu6502
             new("BRK", &BRK, &ImmediateMode, 7),
             new("ORA", &ORA, &IndirectXMode, 6),
             new("???", &XXX, &ImpliedMode, 2),
-            new("???", &XXX, &ImpliedMode, 8),
-            new("???", &NOP, &ImpliedMode, 3),
+            new("SLO", &SLO, &IndirectXMode, 8),
+            new("DOP", &NOP, &ZeroPageMode, 3),
             new("ORA", &ORA, &ZeroPageMode, 3),
             new("ASL", &ASL, &ZeroPageMode, 5),
-            new("???", &XXX, &ImpliedMode, 5),
+            new("SLO", &SLO, &ZeroPageMode, 5),
             new("PHP", &PHP, &ImpliedMode, 3),
             new("ORA", &ORA, &ImmediateMode, 2),
             new("ASL", &ASL, &ImpliedMode, 2),
             new("???", &XXX, &ImpliedMode, 2),
-            new("???", &NOP, &ImpliedMode, 4),
+            new("TOP", &NOP, &AbsoluteMode, 4),
             new("ORA", &ORA, &AbsoluteMode, 4),
             new("ASL", &ASL, &AbsoluteMode, 6),
-            new("???", &XXX, &ImpliedMode, 6),
+            new("SLO", &SLO, &AbsoluteMode, 6),
 
             new("BPL", &BPL, &RelativeMode, 2),
             new("ORA", &ORA, &IndirectYMode, 5),
             new("???", &XXX, &ImpliedMode, 2),
-            new("???", &XXX, &ImpliedMode, 8),
-            new("???", &NOP, &ImpliedMode, 4),
+            new("SLO", &SLO, &IndirectYMode, 8),
+            new("DOP", &NOP, &ZeroPageXMode, 4),
             new("ORA", &ORA, &ZeroPageXMode, 4),
             new("ASL", &ASL, &ZeroPageXMode, 6),
-            new("???", &XXX, &ImpliedMode, 6),
+            new("SLO", &SLO, &ZeroPageXMode, 6),
             new("CLC", &CLC, &ImpliedMode, 2),
             new("ORA", &ORA, &AbsoluteYMode, 4),
             new("???", &NOP, &ImpliedMode, 2),
-            new("???", &XXX, &ImpliedMode, 7),
-            new("???", &NOP, &ImpliedMode, 4),
+            new("SLO", &SLO, &AbsoluteYMode, 7),
+            new("TOP", &NOP, &AbsoluteXMode, 4),
             new("ORA", &ORA, &AbsoluteXMode, 4),
             new("ASL", &ASL, &AbsoluteXMode, 7),
-            new("???", &XXX, &ImpliedMode, 7),
+            new("SLO", &SLO, &AbsoluteXMode, 7),
 
             new("JSR", &JSR, &AbsoluteMode, 6),
             new("AND", &AND, &IndirectXMode, 6),
             new("???", &XXX, &ImpliedMode, 2),
-            new("???", &XXX, &ImpliedMode, 8),
+            new("RLA", &RLA, &IndirectXMode, 8),
             new("BIT", &BIT, &ZeroPageMode, 3),
             new("AND", &AND, &ZeroPageMode, 3),
             new("ROL", &ROL, &ZeroPageMode, 5),
-            new("???", &XXX, &ImpliedMode, 5),
+            new("RLA", &RLA, &ZeroPageMode, 5),
             new("PLP", &PLP, &ImpliedMode, 4),
             new("AND", &AND, &ImmediateMode, 2),
             new("ROL", &ROL, &ImpliedMode, 2),
@@ -920,33 +1024,33 @@ public sealed unsafe class Cpu6502
             new("BIT", &BIT, &AbsoluteMode, 4),
             new("AND", &AND, &AbsoluteMode, 4),
             new("ROL", &ROL, &AbsoluteMode, 6),
-            new("???", &XXX, &ImpliedMode, 6),
+            new("RLA", &RLA, &AbsoluteMode, 6),
 
             new("BMI", &BMI, &RelativeMode, 2),
             new("AND", &AND, &IndirectYMode, 5),
             new("???", &XXX, &ImpliedMode, 2),
-            new("???", &XXX, &ImpliedMode, 8),
-            new("???", &NOP, &ImpliedMode, 4),
+            new("RLA", &RLA, &IndirectYMode, 8),
+            new("DOP", &NOP, &ZeroPageXMode, 4),
             new("AND", &AND, &ZeroPageXMode, 4),
             new("ROL", &ROL, &ZeroPageXMode, 6),
-            new("???", &XXX, &ImpliedMode, 6),
+            new("RLA", &RLA, &ZeroPageXMode, 6),
             new("SEC", &SEC, &ImpliedMode, 2),
             new("AND", &AND, &AbsoluteYMode, 4),
             new("???", &NOP, &ImpliedMode, 2),
-            new("???", &XXX, &ImpliedMode, 7),
-            new("???", &NOP, &ImpliedMode, 4),
+            new("RLA", &RLA, &AbsoluteYMode, 7),
+            new("TOP", &NOP, &AbsoluteXMode, 4),
             new("AND", &AND, &AbsoluteXMode, 4),
             new("ROL", &ROL, &AbsoluteXMode, 7),
-            new("???", &XXX, &ImpliedMode, 7),
+            new("RLA", &RLA, &AbsoluteXMode, 7),
 
             new("RTI", &RTI, &ImpliedMode, 6),
             new("EOR", &EOR, &IndirectXMode, 6),
             new("???", &XXX, &ImpliedMode, 2),
-            new("???", &XXX, &ImpliedMode, 8),
-            new("???", &NOP, &ImpliedMode, 3),
+            new("SRE", &SRE, &IndirectXMode, 8),
+            new("DOP", &NOP, &ZeroPageMode, 3),
             new("EOR", &EOR, &ZeroPageMode, 3),
             new("LSR", &LSR, &ZeroPageMode, 5),
-            new("???", &XXX, &ImpliedMode, 5),
+            new("SRE", &SRE, &ZeroPageMode, 5),
             new("PHA", &PHA, &ImpliedMode, 3),
             new("EOR", &EOR, &ImmediateMode, 2),
             new("LSR", &LSR, &ImpliedMode, 2),
@@ -954,33 +1058,33 @@ public sealed unsafe class Cpu6502
             new("JMP", &JMP, &AbsoluteMode, 3),
             new("EOR", &EOR, &AbsoluteMode, 4),
             new("LSR", &LSR, &AbsoluteMode, 6),
-            new("???", &XXX, &ImpliedMode, 6),
+            new("SRE", &SRE, &AbsoluteMode, 6),
 
             new("BVC", &BVC, &RelativeMode, 2),
             new("EOR", &EOR, &IndirectYMode, 5),
             new("???", &XXX, &ImpliedMode, 2),
-            new("???", &XXX, &ImpliedMode, 8),
-            new("???", &NOP, &ImpliedMode, 4),
+            new("SRE", &SRE, &IndirectYMode, 8),
+            new("DOP", &NOP, &ZeroPageXMode, 4),
             new("EOR", &EOR, &ZeroPageXMode, 4),
             new("LSR", &LSR, &ZeroPageXMode, 6),
-            new("???", &XXX, &ImpliedMode, 6),
+            new("SRE", &SRE, &ZeroPageXMode, 6),
             new("CLI", &CLI, &ImpliedMode, 2),
             new("EOR", &EOR, &AbsoluteYMode, 4),
             new("???", &NOP, &ImpliedMode, 2),
-            new("???", &XXX, &ImpliedMode, 7),
-            new("???", &NOP, &ImpliedMode, 4),
+            new("SRE", &SRE, &AbsoluteYMode, 7),
+            new("TOP", &NOP, &AbsoluteXMode, 4),
             new("EOR", &EOR, &AbsoluteXMode, 4),
             new("LSR", &LSR, &AbsoluteXMode, 7),
-            new("???", &XXX, &ImpliedMode, 7),
+            new("SRE", &SRE, &AbsoluteXMode, 7),
 
             new("RTS", &RTS, &ImpliedMode, 6),
             new("ADC", &ADC, &IndirectXMode, 6),
             new("???", &XXX, &ImpliedMode, 2),
-            new("???", &XXX, &ImpliedMode, 8),
-            new("???", &NOP, &ImpliedMode, 3),
+            new("RRA", &RRA, &IndirectXMode, 8),
+            new("DOP", &NOP, &ZeroPageMode, 3),
             new("ADC", &ADC, &ZeroPageMode, 3),
             new("ROR", &ROR, &ZeroPageMode, 5),
-            new("???", &XXX, &ImpliedMode, 5),
+            new("RRA", &RRA, &ZeroPageMode, 5),
             new("PLA", &PLA, &ImpliedMode, 4),
             new("ADC", &ADC, &ImmediateMode, 2),
             new("ROR", &ROR, &ImpliedMode, 2),
@@ -988,41 +1092,41 @@ public sealed unsafe class Cpu6502
             new("JMP", &JMP, &IndirectMode, 5),
             new("ADC", &ADC, &AbsoluteMode, 4),
             new("ROR", &ROR, &AbsoluteMode, 6),
-            new("???", &XXX, &ImpliedMode, 6),
+            new("RRA", &RRA, &AbsoluteMode, 6),
 
             new("BVS", &BVS, &RelativeMode, 2),
             new("ADC", &ADC, &IndirectYMode, 5),
             new("???", &XXX, &ImpliedMode, 2),
-            new("???", &XXX, &ImpliedMode, 8),
-            new("???", &NOP, &ImpliedMode, 4),
+            new("RRA", &RRA, &IndirectYMode, 8),
+            new("DOP", &NOP, &ZeroPageXMode, 4),
             new("ADC", &ADC, &ZeroPageXMode, 4),
             new("ROR", &ROR, &ZeroPageXMode, 6),
-            new("???", &XXX, &ImpliedMode, 6),
+            new("RRA", &RRA, &ZeroPageXMode, 6),
             new("SEI", &SEI, &ImpliedMode, 2),
             new("ADC", &ADC, &AbsoluteYMode, 4),
             new("???", &NOP, &ImpliedMode, 2),
-            new("???", &XXX, &ImpliedMode, 7),
-            new("???", &NOP, &ImpliedMode, 4),
+            new("RRA", &RRA, &AbsoluteYMode, 7),
+            new("TOP", &NOP, &AbsoluteXMode, 4),
             new("ADC", &ADC, &AbsoluteXMode, 4),
             new("ROR", &ROR, &AbsoluteXMode, 7),
-            new("???", &XXX, &ImpliedMode, 7),
+            new("RRA", &RRA, &AbsoluteXMode, 7),
 
-            new("???", &NOP, &ImpliedMode, 2),
+            new("DOP", &NOP, &ImmediateMode, 2),
             new("STA", &STA, &IndirectXMode, 6),
-            new("???", &NOP, &ImpliedMode, 2),
-            new("???", &XXX, &ImpliedMode, 6),
+            new("DOP", &NOP, &ImmediateMode, 2),
+            new("SAX", &SAX, &IndirectXMode, 6),
             new("STY", &STY, &ZeroPageMode, 3),
             new("STA", &STA, &ZeroPageMode, 3),
             new("STX", &STX, &ZeroPageMode, 3),
-            new("???", &XXX, &ImpliedMode, 3),
+            new("SAX", &SAX, &ZeroPageMode, 3),
             new("DEY", &DEY, &ImpliedMode, 2),
-            new("???", &NOP, &ImpliedMode, 2),
+            new("DOP", &NOP, &ImmediateMode, 2),
             new("TXA", &TXA, &ImpliedMode, 2),
             new("???", &XXX, &ImpliedMode, 2),
             new("STY", &STY, &AbsoluteMode, 4),
             new("STA", &STA, &AbsoluteMode, 4),
             new("STX", &STX, &AbsoluteMode, 4),
-            new("???", &XXX, &ImpliedMode, 4),
+            new("SAX", &SAX, &AbsoluteMode, 4),
 
             new("BCC", &BCC, &RelativeMode, 2),
             new("STA", &STA, &IndirectYMode, 6),
@@ -1031,7 +1135,7 @@ public sealed unsafe class Cpu6502
             new("STY", &STY, &ZeroPageXMode, 4),
             new("STA", &STA, &ZeroPageXMode, 4),
             new("STX", &STX, &ZeroPageYMode, 4),
-            new("???", &XXX, &ImpliedMode, 4),
+            new("SAX", &SAX, &ZeroPageYMode, 4),
             new("TYA", &TYA, &ImpliedMode, 2),
             new("STA", &STA, &AbsoluteYMode, 5),
             new("TXS", &TXS, &ImpliedMode, 2),
@@ -1044,11 +1148,11 @@ public sealed unsafe class Cpu6502
             new("LDY", &LDY, &ImmediateMode, 2),
             new("LDA", &LDA, &IndirectXMode, 6),
             new("LDX", &LDX, &ImmediateMode, 2),
-            new("???", &XXX, &ImpliedMode, 6),
+            new("LAX", &LAX, &IndirectXMode, 6),
             new("LDY", &LDY, &ZeroPageMode, 3),
             new("LDA", &LDA, &ZeroPageMode, 3),
             new("LDX", &LDX, &ZeroPageMode, 3),
-            new("???", &XXX, &ImpliedMode, 3),
+            new("LAX", &LAX, &ZeroPageMode, 3),
             new("TAY", &TAY, &ImpliedMode, 2),
             new("LDA", &LDA, &ImmediateMode, 2),
             new("TAX", &TAX, &ImpliedMode, 2),
@@ -1056,16 +1160,16 @@ public sealed unsafe class Cpu6502
             new("LDY", &LDY, &AbsoluteMode, 4),
             new("LDA", &LDA, &AbsoluteMode, 4),
             new("LDX", &LDX, &AbsoluteMode, 4),
-            new("???", &XXX, &ImpliedMode, 4),
+            new("LAX", &LAX, &AbsoluteMode, 4),
 
             new("BCS", &BCS, &RelativeMode, 2),
             new("LDA", &LDA, &IndirectYMode, 5),
             new("???", &XXX, &ImpliedMode, 2),
-            new("???", &XXX, &ImpliedMode, 5),
+            new("LAX", &LAX, &IndirectYMode, 5),
             new("LDY", &LDY, &ZeroPageXMode, 4),
             new("LDA", &LDA, &ZeroPageXMode, 4),
             new("LDX", &LDX, &ZeroPageYMode, 4),
-            new("???", &XXX, &ImpliedMode, 4),
+            new("LAX", &LAX, &ZeroPageYMode, 4),
             new("CLV", &CLV, &ImpliedMode, 2),
             new("LDA", &LDA, &AbsoluteYMode, 4),
             new("TSX", &TSX, &ImpliedMode, 2),
@@ -1073,16 +1177,16 @@ public sealed unsafe class Cpu6502
             new("LDY", &LDY, &AbsoluteXMode, 4),
             new("LDA", &LDA, &AbsoluteXMode, 4),
             new("LDX", &LDX, &AbsoluteYMode, 4),
-            new("???", &XXX, &ImpliedMode, 4),
+            new("LAX", &LAX, &AbsoluteYMode, 4),
 
             new("CPY", &CPY, &ImmediateMode, 2),
             new("CMP", &CMP, &IndirectXMode, 6),
-            new("???", &NOP, &ImpliedMode, 2),
-            new("???", &XXX, &ImpliedMode, 8),
+            new("DOP", &NOP, &ImmediateMode, 2),
+            new("DCP", &DCP, &IndirectXMode, 8),
             new("CPY", &CPY, &ZeroPageMode, 3),
             new("CMP", &CMP, &ZeroPageMode, 3),
             new("DEC", &DEC, &ZeroPageMode, 5),
-            new("???", &XXX, &ImpliedMode, 5),
+            new("DCP", &DCP, &ZeroPageMode, 5),
             new("INY", &INY, &ImpliedMode, 2),
             new("CMP", &CMP, &ImmediateMode, 2),
             new("DEX", &DEX, &ImpliedMode, 2),
@@ -1090,58 +1194,58 @@ public sealed unsafe class Cpu6502
             new("CPY", &CPY, &AbsoluteMode, 4),
             new("CMP", &CMP, &AbsoluteMode, 4),
             new("DEC", &DEC, &AbsoluteMode, 6),
-            new("???", &XXX, &ImpliedMode, 6),
+            new("DCP", &DCP, &AbsoluteMode, 6),
 
             new("BNE", &BNE, &RelativeMode, 2),
             new("CMP", &CMP, &IndirectYMode, 5),
             new("???", &XXX, &ImpliedMode, 2),
-            new("???", &XXX, &ImpliedMode, 8),
-            new("???", &NOP, &ImpliedMode, 4),
+            new("DCP", &DCP, &IndirectYMode, 8),
+            new("DOP", &NOP, &ZeroPageXMode, 4),
             new("CMP", &CMP, &ZeroPageXMode, 4),
             new("DEC", &DEC, &ZeroPageXMode, 6),
-            new("???", &XXX, &ImpliedMode, 6),
+            new("DCP", &DCP, &ZeroPageXMode, 6),
             new("CLD", &CLD, &ImpliedMode, 2),
             new("CMP", &CMP, &AbsoluteYMode, 4),
             new("NOP", &NOP, &ImpliedMode, 2),
-            new("???", &XXX, &ImpliedMode, 7),
-            new("???", &NOP, &ImpliedMode, 4),
+            new("DCP", &DCP, &AbsoluteYMode, 7),
+            new("TOP", &NOP, &AbsoluteXMode, 4),
             new("CMP", &CMP, &AbsoluteXMode, 4),
             new("DEC", &DEC, &AbsoluteXMode, 7),
-            new("???", &XXX, &ImpliedMode, 7),
+            new("DCP", &DCP, &AbsoluteXMode, 7),
 
             new("CPX", &CPX, &ImmediateMode, 2),
             new("SBC", &SBC, &IndirectXMode, 6),
-            new("???", &NOP, &ImpliedMode, 2),
-            new("???", &XXX, &ImpliedMode, 8),
+            new("DOP", &NOP, &ImmediateMode, 2),
+            new("ISC", &ISC, &IndirectXMode, 8),
             new("CPX", &CPX, &ZeroPageMode, 3),
             new("SBC", &SBC, &ZeroPageMode, 3),
             new("INC", &INC, &ZeroPageMode, 5),
-            new("???", &XXX, &ImpliedMode, 5),
+            new("ISC", &ISC, &ZeroPageMode, 5),
             new("INX", &INX, &ImpliedMode, 2),
             new("SBC", &SBC, &ImmediateMode, 2),
             new("NOP", &NOP, &ImpliedMode, 2),
-            new("???", &SBC, &ImpliedMode, 2),
+            new("SBC", &SBC, &ImmediateMode, 2),
             new("CPX", &CPX, &AbsoluteMode, 4),
             new("SBC", &SBC, &AbsoluteMode, 4),
             new("INC", &INC, &AbsoluteMode, 6),
-            new("???", &XXX, &ImpliedMode, 6),
+            new("ISC", &ISC, &AbsoluteMode, 6),
 
             new("BEQ", &BEQ, &RelativeMode, 2),
             new("SBC", &SBC, &IndirectYMode, 5),
             new("???", &XXX, &ImpliedMode, 2),
-            new("???", &XXX, &ImpliedMode, 8),
-            new("???", &NOP, &ImpliedMode, 4),
+            new("ISC", &ISC, &IndirectYMode, 8),
+            new("DOP", &NOP, &ZeroPageXMode, 4),
             new("SBC", &SBC, &ZeroPageXMode, 4),
             new("INC", &INC, &ZeroPageXMode, 6),
-            new("???", &XXX, &ImpliedMode, 6),
+            new("ISC", &ISC, &ZeroPageXMode, 6),
             new("SED", &SED, &ImpliedMode, 2),
             new("SBC", &SBC, &AbsoluteYMode, 4),
             new("NOP", &NOP, &ImpliedMode, 2),
-            new("???", &XXX, &ImpliedMode, 7),
-            new("???", &NOP, &ImpliedMode, 4),
+            new("ISC", &ISC, &AbsoluteYMode, 7),
+            new("TOP", &NOP, &AbsoluteXMode, 4),
             new("SBC", &SBC, &AbsoluteXMode, 4),
             new("INC", &INC, &AbsoluteXMode, 7),
-            new("???", &XXX, &ImpliedMode, 7)
+            new("ISC", &ISC, &AbsoluteXMode, 7)
         ];
     }
 }

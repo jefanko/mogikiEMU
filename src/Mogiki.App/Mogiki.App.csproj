@@ -24,8 +24,14 @@
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.2.4" />
   </ItemGroup>
 
-  <ItemGroup Condition="Exists('C:\msys64\ucrt64\bin\SDL2.dll')">
-    <None Include="C:\msys64\ucrt64\bin\SDL2.dll">
+  <ItemGroup Condition="Exists('..\..\SDL3.dll')">
+    <None Include="..\..\SDL3.dll" Link="SDL3.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('C:\msys64\ucrt64\bin\SDL3.dll')">
+    <None Include="C:\msys64\ucrt64\bin\SDL3.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

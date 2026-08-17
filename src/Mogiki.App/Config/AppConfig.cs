@@ -26,9 +26,11 @@ public sealed class AppConfig
     public KeyBindings Keys { get; set; } = new();
     public int WindowScale { get; set; } = 3;
     public string LastRomPath { get; set; } = "";
+    public string LibraryDirectory { get; set; } = "";
     public List<string> RecentRoms { get; set; } = [];
     public AspectRatioMode AspectRatio { get; set; } = AspectRatioMode.Standard4_3;
     public bool BilinearFilter { get; set; } = false;
+    public string RendererBackend { get; set; } = "auto";
     public int Volume { get; set; } = 100; // 0 to 100
     public bool SoundEnabled { get; set; } = true;
 
@@ -91,8 +93,16 @@ public sealed class AppConfig
                     BilinearFilter = filter;
                     break;
 
+                case "renderer" when !string.IsNullOrWhiteSpace(val):
+                    RendererBackend = val.ToLowerInvariant();
+                    break;
+
                 case "lastrom":
                     LastRomPath = val;
+                    break;
+
+                case "library":
+                    LibraryDirectory = val;
                     break;
 
                 case "recent":
@@ -121,6 +131,7 @@ public sealed class AppConfig
         writer.WriteLine($"scale={WindowScale}");
         writer.WriteLine($"aspect={AspectRatio}");
         writer.WriteLine($"bilinear={BilinearFilter}");
+        writer.WriteLine($"renderer={RendererBackend}");
         writer.WriteLine();
         writer.WriteLine("[Audio]");
         writer.WriteLine($"sound={SoundEnabled}");
@@ -128,6 +139,7 @@ public sealed class AppConfig
         writer.WriteLine();
         writer.WriteLine("[Recent]");
         writer.WriteLine($"lastrom={LastRomPath}");
+        writer.WriteLine($"library={LibraryDirectory}");
         foreach (var recent in RecentRoms)
         {
             writer.WriteLine($"recent={recent}");

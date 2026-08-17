@@ -183,6 +183,14 @@ public sealed class Ppu2C02
         return _palScreen[PpuRead((ushort)(0x3F00 + (palette << 2) + pixel)) & 0x3F];
     }
 
+    public void CopyFrameTo(Span<uint> destination)
+    {
+        if (destination.Length < ScreenArgb.Length)
+            throw new ArgumentException("The destination frame buffer is too small.", nameof(destination));
+
+        ScreenArgb.AsSpan().CopyTo(destination);
+    }
+
     public byte CpuRead(ushort addr, bool readOnly = false)
     {
         byte data = 0x00;

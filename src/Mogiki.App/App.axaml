@@ -2,8 +2,133 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Mogiki.App.App"
              RequestedThemeVariant="Dark">
+    <Application.Resources>
+        <SolidColorBrush x:Key="AppBackgroundBrush" Color="#0F1012" />
+        <SolidColorBrush x:Key="SurfaceBrush" Color="#17191D" />
+        <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#202329" />
+        <SolidColorBrush x:Key="SurfaceHoverBrush" Color="#2A2E35" />
+        <SolidColorBrush x:Key="BorderBrush" Color="#30343B" />
+        <SolidColorBrush x:Key="TextBrush" Color="#F4F5F7" />
+        <SolidColorBrush x:Key="MutedTextBrush" Color="#98A0AA" />
+        <SolidColorBrush x:Key="SubtleTextBrush" Color="#69727D" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#EE7448" />
+        <SolidColorBrush x:Key="AccentHoverBrush" Color="#FF8B5E" />
+        <SolidColorBrush x:Key="AccentPressedBrush" Color="#CF5A34" />
+        <SolidColorBrush x:Key="AccentMutedBrush" Color="#3C2923" />
+        <SolidColorBrush x:Key="SuccessBrush" Color="#53C98B" />
+        <SolidColorBrush x:Key="WarningBrush" Color="#F0C674" />
+    </Application.Resources>
+
     <Application.Styles>
         <FluentTheme />
-        <StyleInclude Source="avares://Avalonia.Themes.Fluent/FluentTheme.axaml" />
+
+        <Style Selector="Window">
+            <Setter Property="Background" Value="{DynamicResource AppBackgroundBrush}" />
+            <Setter Property="FontFamily" Value="Inter" />
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+        </Style>
+
+        <Style Selector="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+        </Style>
+
+        <Style Selector="TextBlock.muted">
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+        </Style>
+
+        <Style Selector="TextBlock.eyebrow">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+        </Style>
+
+        <Style Selector="Button">
+            <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="14,9" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <Style Selector="Button:pointerover">
+            <Setter Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+            <Setter Property="BorderBrush" Value="#454B55" />
+        </Style>
+
+        <Style Selector="Button:pressed">
+            <Setter Property="Background" Value="#15171A" />
+        </Style>
+
+        <Style Selector="Button.primary">
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="Foreground" Value="#180D09" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style Selector="Button.primary:pointerover">
+            <Setter Property="Background" Value="{DynamicResource AccentHoverBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentHoverBrush}" />
+        </Style>
+
+        <Style Selector="Button.primary:pressed">
+            <Setter Property="Background" Value="{DynamicResource AccentPressedBrush}" />
+        </Style>
+
+        <Style Selector="Button.stop">
+            <Setter Property="Background" Value="#3A2424" />
+            <Setter Property="BorderBrush" Value="#6B3A36" />
+            <Setter Property="Foreground" Value="#FFB4A3" />
+        </Style>
+
+        <Style Selector="Button.stop:pointerover">
+            <Setter Property="Background" Value="#51302D" />
+            <Setter Property="BorderBrush" Value="#8C4B42" />
+        </Style>
+
+        <Style Selector="Button.navButton">
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="Padding" Value="14,11" />
+            <Setter Property="Margin" Value="0,2" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <Style Selector="Button.navButton:pointerover">
+            <Setter Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+
+        <Style Selector="Button.navButton.selected">
+            <Setter Property="Background" Value="{DynamicResource AccentMutedBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentHoverBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style Selector="Menu">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+        </Style>
+
+        <Style Selector="MenuItem">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Padding" Value="10,7" />
+        </Style>
+
+        <Style Selector="ComboBox">
+            <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+        </Style>
+
+        <Style Selector="ScrollViewer">
+            <Setter Property="HorizontalScrollBarVisibility" Value="Hidden" />
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+        </Style>
     </Application.Styles>
 </Application>

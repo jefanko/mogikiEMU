@@ -26,6 +26,8 @@ The core follows an **accuracy-first, bus-centric architecture**, simulating the
 ### 🖥️ Modern Avalonia UI
 - **Dark Fluent Theme**: Clean modern aesthetics powered by `Avalonia.Themes.Fluent` with Inter typography and custom status pills.
 - **Hardware-Accelerated Viewport**: High-performance 60.1 FPS direct memory blitting via `WriteableBitmap`.
+- **Dedicated Game Window**: Games open in their own window, with `F11` fullscreen and `Escape` to stop and return to the library.
+- **SDL3 Audio Output**: Stream-based, batched float audio with explicit pause/resume and graceful fallback when SDL3 is unavailable.
 - **Drag & Drop**: Drag any `.nes` ROM file from Windows Explorer directly onto the emulator window to launch immediately.
 - **Recent ROMs Menu**: Automatically tracks and remembers your last 10 games.
 - **Aspect Ratio Controls**:
@@ -67,6 +69,8 @@ The core follows an **accuracy-first, bus-centric architecture**, simulating the
 | **Select** | `A` | Select / Item |
 | **Open ROM** | `Ctrl + O` / `F1` | Open file picker dialog |
 | **Pause / Resume** | `Space` / `P` | Pause emulation |
+| **Stop / Return to Library** | `Escape` | Close the game window and return to the launcher |
+| **Fullscreen** | `F11` | Toggle fullscreen for the dedicated game window |
 | **Reset** | `Ctrl + R` | Reset system |
 | **Fast Forward** | `Tab` | Turbo speed |
 | **Screenshot** | `F12` | Save screenshot PNG |
@@ -74,6 +78,25 @@ The core follows an **accuracy-first, bus-centric architecture**, simulating the
 > *All controller keys can be customized via **Config $\rightarrow$ Controller Configuration...***
 
 ---
+
+## Runtime and rendering architecture
+
+The launcher owns the UI only. `EmulatorSession` owns the NES bus and
+cartridge lifetime, while `EmulationRunner` clocks it on a dedicated thread.
+Completed PPU frames are exchanged through a two-slot ownership pipeline, so
+the presenter never reads a buffer while the emulator is writing it.
+
+The dedicated game window prefers `Sdl3GpuRenderer`. It uploads the 256x240
+frame to a streaming SDL3 texture and lets SDL choose an accelerated backend
+(Vulkan, OpenGL, Direct3D, or the available fallback). Set
+`renderer=opengl`, `renderer=vulkan`, or `renderer=auto` in `config.ini`.
+Avalonia remains the fallback when SDL3 or the requested backend is unavailable.
+
+## ROM regression tests
+
+`dotnet test` runs the canonical `nestest` CPU trace, official instruction and
+PPU VBL ROM smoke tests, controller strobe timing tests, and frame-pipeline
+ownership tests. The ROM inputs and SHA-256 records live under `tests/Roms`.
 
 ## 🚀 Getting Started & Building
 

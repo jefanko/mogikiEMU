@@ -15,6 +15,7 @@ public sealed class Cartridge
 
     public byte[] PrgMemory { get; private set; } = [];
     public byte[] ChrMemory { get; private set; } = [];
+    public byte[] PrgRam { get; } = new byte[8192];
 
     public Mapper? Mapper { get; private set; }
 
@@ -73,6 +74,7 @@ public sealed class Cartridge
             0 => new Mapper000(PrgBanks, ChrBanks, hwMirror),
             1 => new Mapper001(PrgBanks, ChrBanks),
             2 => new Mapper002(PrgBanks, ChrBanks, hwMirror),
+            3 => new Mapper003(PrgBanks, ChrBanks, hwMirror),
             4 => new Mapper004(PrgBanks, ChrBanks),
             5 => new Mapper005(PrgBanks, ChrBanks),
             69 => new Mapper069(PrgBanks, ChrBanks),
@@ -95,6 +97,7 @@ public sealed class Cartridge
             0 => new Mapper000(PrgBanks, ChrBanks, hwMirror),
             1 => new Mapper001(PrgBanks, ChrBanks),
             2 => new Mapper002(PrgBanks, ChrBanks, hwMirror),
+            3 => new Mapper003(PrgBanks, ChrBanks, hwMirror),
             4 => new Mapper004(PrgBanks, ChrBanks),
             5 => new Mapper005(PrgBanks, ChrBanks),
             69 => new Mapper069(PrgBanks, ChrBanks),
@@ -159,6 +162,12 @@ public sealed class Cartridge
             }
             return true;
         }
+        if (addr is >= 0x6000 and <= 0x7FFF)
+        {
+            data = PrgRam[addr & 0x1FFF];
+            return true;
+        }
+
         return false;
     }
 
@@ -179,6 +188,12 @@ public sealed class Cartridge
             }
             return true;
         }
+        if (addr is >= 0x6000 and <= 0x7FFF)
+        {
+            PrgRam[addr & 0x1FFF] = data;
+            return true;
+        }
+
         return false;
     }
 
