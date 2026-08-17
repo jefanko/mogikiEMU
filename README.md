@@ -28,6 +28,8 @@ The core follows an **accuracy-first, bus-centric architecture**, simulating the
 - **Hardware-Accelerated Viewport**: High-performance 60.1 FPS direct memory blitting via `WriteableBitmap`.
 - **Dedicated Game Window**: Games open in their own window, with `F11` fullscreen and `Escape` to stop and return to the library.
 - **SDL3 Audio Output**: Stream-based, batched float audio with explicit pause/resume and graceful fallback when SDL3 is unavailable.
+- **Unified Settings**: A dedicated Settings window groups graphics backend, scale, aspect ratio, filtering, fullscreen-on-launch, audio, controller, and library options.
+- **Graphics Backend Selection**: Choose Automatic, Vulkan, OpenGL, Direct3D 11, Direct3D 12, or the Avalonia software presentation fallback.
 - **Drag & Drop**: Drag any `.nes` ROM file from Windows Explorer directly onto the emulator window to launch immediately.
 - **Recent ROMs Menu**: Automatically tracks and remembers your last 10 games.
 - **Aspect Ratio Controls**:
@@ -89,8 +91,11 @@ the presenter never reads a buffer while the emulator is writing it.
 The dedicated game window prefers `Sdl3GpuRenderer`. It uploads the 256x240
 frame to a streaming SDL3 texture and lets SDL choose an accelerated backend
 (Vulkan, OpenGL, Direct3D, or the available fallback). Set
-`renderer=opengl`, `renderer=vulkan`, or `renderer=auto` in `config.ini`.
-Avalonia remains the fallback when SDL3 or the requested backend is unavailable.
+`renderer=opengl`, `renderer=vulkan`, or `renderer=auto` in `config.ini`, or
+choose the backend from **Settings -> Graphics**. The Settings window also
+persists scale, aspect ratio, bilinear filtering, fullscreen-on-launch, audio,
+controller, and library preferences. Avalonia remains the fallback when SDL3
+or the requested backend is unavailable.
 
 ## ROM regression tests
 

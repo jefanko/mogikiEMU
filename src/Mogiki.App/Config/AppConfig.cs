@@ -12,6 +12,25 @@ public sealed class KeyBindings
     public Key B { get; set; } = Key.Z;
     public Key Start { get; set; } = Key.S;
     public Key Select { get; set; } = Key.A;
+
+    public KeyBindings Clone()
+    {
+        var copy = new KeyBindings();
+        copy.CopyFrom(this);
+        return copy;
+    }
+
+    public void CopyFrom(KeyBindings other)
+    {
+        Up = other.Up;
+        Down = other.Down;
+        Left = other.Left;
+        Right = other.Right;
+        A = other.A;
+        B = other.B;
+        Start = other.Start;
+        Select = other.Select;
+    }
 }
 
 public enum AspectRatioMode
@@ -23,6 +42,16 @@ public enum AspectRatioMode
 
 public sealed class AppConfig
 {
+    public static IReadOnlyList<string> SupportedRendererBackends { get; } =
+    [
+        "auto",
+        "vulkan",
+        "opengl",
+        "direct3d11",
+        "direct3d12",
+        "avalonia"
+    ];
+
     public KeyBindings Keys { get; set; } = new();
     public int WindowScale { get; set; } = 3;
     public string LastRomPath { get; set; } = "";
@@ -31,8 +60,45 @@ public sealed class AppConfig
     public AspectRatioMode AspectRatio { get; set; } = AspectRatioMode.Standard4_3;
     public bool BilinearFilter { get; set; } = false;
     public string RendererBackend { get; set; } = "auto";
+    public bool StartFullscreen { get; set; }
     public int Volume { get; set; } = 100; // 0 to 100
     public bool SoundEnabled { get; set; } = true;
+
+    public AppConfig Clone()
+    {
+        var copy = new AppConfig();
+        copy.CopyFrom(this);
+        return copy;
+    }
+
+    public void CopyFrom(AppConfig other)
+    {
+        Keys.CopyFrom(other.Keys);
+        WindowScale = other.WindowScale;
+        LastRomPath = other.LastRomPath;
+        LibraryDirectory = other.LibraryDirectory;
+        RecentRoms = [.. other.RecentRoms];
+        AspectRatio = other.AspectRatio;
+        BilinearFilter = other.BilinearFilter;
+        RendererBackend = NormalizeRendererBackend(other.RendererBackend);
+        StartFullscreen = other.StartFullscreen;
+        Volume = Math.Clamp(other.Volume, 0, 100);
+        SoundEnabled = other.SoundEnabled;
+    }
+
+    public static string NormalizeRendererBackend(string? backend)
+    {
+        return backend?.Trim().ToLowerInvariant() switch
+        {
+            "auto" => "auto",
+            "vulkan" => "vulkan",
+            "opengl" or "opengl3" => "opengl",
+            "direct3d11" or "d3d11" => "direct3d11",
+            "direct3d12" or "d3d12" => "direct3d12",
+            "avalonia" or "software" or "bitmap" => "avalonia",
+            _ => "auto"
+        };
+    }
 
     public void AddRecentRom(string path)
     {
@@ -94,7 +160,11 @@ public sealed class AppConfig
                     break;
 
                 case "renderer" when !string.IsNullOrWhiteSpace(val):
-                    RendererBackend = val.ToLowerInvariant();
+                    RendererBackend = NormalizeRendererBackend(val);
+                    break;
+
+                case "fullscreen" when bool.TryParse(val, out bool fullscreen):
+                    StartFullscreen = fullscreen;
                     break;
 
                 case "lastrom":
@@ -131,7 +201,8 @@ public sealed class AppConfig
         writer.WriteLine($"scale={WindowScale}");
         writer.WriteLine($"aspect={AspectRatio}");
         writer.WriteLine($"bilinear={BilinearFilter}");
-        writer.WriteLine($"renderer={RendererBackend}");
+        writer.WriteLine($"renderer={NormalizeRendererBackend(RendererBackend)}");
+        writer.WriteLine($"fullscreen={StartFullscreen}");
         writer.WriteLine();
         writer.WriteLine("[Audio]");
         writer.WriteLine($"sound={SoundEnabled}");

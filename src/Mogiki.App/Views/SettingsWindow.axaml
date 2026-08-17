@@ -1,0 +1,269 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Mogiki.App.Views.SettingsWindow"
+        Title="Mogiki Settings"
+        Icon="/Assets/mgkEMU.png"
+        Width="820" Height="700"
+        MinWidth="720" MinHeight="600"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppBackgroundBrush}">
+
+    <Grid RowDefinitions="Auto,*,Auto" Margin="26">
+        <StackPanel Grid.Row="0" Spacing="4">
+            <TextBlock Text="SETTINGS" Classes="eyebrow" />
+            <TextBlock Text="Configure Mogiki" FontSize="25" FontWeight="SemiBold" />
+            <TextBlock Text="Choose how games are presented, sounded, and controlled. Changes can be applied while a game is paused."
+                       Classes="muted"
+                       FontSize="12"
+                       TextWrapping="Wrap" />
+        </StackPanel>
+
+        <TabControl Grid.Row="1" Margin="0,20,0,18">
+            <TabItem Header="Graphics">
+                <ScrollViewer>
+                    <StackPanel Margin="4,12,14,12" Spacing="14">
+                        <Border Padding="18"
+                                Background="{DynamicResource SurfaceBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="10">
+                            <StackPanel Spacing="12">
+                                <StackPanel Spacing="3">
+                                    <TextBlock Text="RENDERING" Classes="eyebrow" />
+                                    <TextBlock Text="Select the presentation backend used by the detached game window."
+                                               Classes="muted"
+                                               FontSize="12"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+
+                                <Grid ColumnDefinitions="190,*"
+                                      RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Graphics backend" VerticalAlignment="Center" />
+                                    <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4">
+                                        <ComboBox x:Name="RendererBackendCombo"
+                                                  Width="360"
+                                                  HorizontalAlignment="Left"
+                                                  SelectionChanged="OnRendererBackendChanged">
+                                            <ComboBoxItem Tag="auto" Content="Automatic (recommended)" />
+                                            <ComboBoxItem Tag="vulkan" Content="Vulkan" />
+                                            <ComboBoxItem Tag="opengl" Content="OpenGL" />
+                                            <ComboBoxItem Tag="direct3d11" Content="Direct3D 11" />
+                                            <ComboBoxItem Tag="direct3d12" Content="Direct3D 12" />
+                                            <ComboBoxItem Tag="avalonia" Content="Software / Avalonia fallback" />
+                                        </ComboBox>
+                                        <TextBlock x:Name="RendererBackendHint"
+                                                   Text="Automatic tries Vulkan, OpenGL, then Direct3D."
+                                                   Classes="muted"
+                                                   FontSize="11"
+                                                   TextWrapping="Wrap" />
+                                    </StackPanel>
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Window scale" VerticalAlignment="Center" />
+                                    <ComboBox x:Name="ScaleCombo" Grid.Row="1" Grid.Column="1" Width="180" HorizontalAlignment="Left">
+                                        <ComboBoxItem Tag="1" Content="1x  (256 x 240)" />
+                                        <ComboBoxItem Tag="2" Content="2x  (512 x 480)" />
+                                        <ComboBoxItem Tag="3" Content="3x  (768 x 720)" />
+                                        <ComboBoxItem Tag="4" Content="4x  (1024 x 960)" />
+                                        <ComboBoxItem Tag="5" Content="5x  (1280 x 1200)" />
+                                        <ComboBoxItem Tag="6" Content="6x  (1536 x 1440)" />
+                                    </ComboBox>
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Aspect ratio" VerticalAlignment="Center" />
+                                    <ComboBox x:Name="AspectRatioCombo" Grid.Row="2" Grid.Column="1" Width="260" HorizontalAlignment="Left">
+                                        <ComboBoxItem Tag="Standard4_3" Content="4:3  Standard TV" />
+                                        <ComboBoxItem Tag="Native8_7" Content="8:7  Authentic NTSC" />
+                                        <ComboBoxItem Tag="PixelPerfect1_1" Content="1:1  Pixel perfect" />
+                                    </ComboBox>
+
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Texture filter" VerticalAlignment="Center" />
+                                    <CheckBox x:Name="BilinearCheckBox"
+                                              Grid.Row="3"
+                                              Grid.Column="1"
+                                              Content="Smooth / bilinear filtering"
+                                              VerticalAlignment="Center" />
+
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Game window" VerticalAlignment="Center" />
+                                    <CheckBox x:Name="StartFullscreenCheckBox"
+                                              Grid.Row="4"
+                                              Grid.Column="1"
+                                              Content="Start games in fullscreen"
+                                              VerticalAlignment="Center" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Padding="18"
+                                Background="{DynamicResource SurfaceRaisedBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="10">
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="ABOUT THE BACKENDS" Classes="eyebrow" />
+                                <TextBlock Text="Vulkan, OpenGL, and Direct3D use SDL3's accelerated texture presentation. The NES CPU and PPU remain emulated on the CPU; the selected backend handles the final frame presentation."
+                                           Classes="muted"
+                                           FontSize="11"
+                                           TextWrapping="Wrap" />
+                                <TextBlock Text="If the selected backend is unavailable, Mogiki falls back to the Avalonia game window."
+                                           Classes="muted"
+                                           FontSize="11"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="Audio">
+                <ScrollViewer>
+                    <StackPanel Margin="4,12,14,12" Spacing="14">
+                        <Border Padding="18"
+                                Background="{DynamicResource SurfaceBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="10">
+                            <StackPanel Spacing="16">
+                                <StackPanel Spacing="3">
+                                    <TextBlock Text="AUDIO OUTPUT" Classes="eyebrow" />
+                                    <TextBlock Text="SDL3 provides the audio device and Mogiki feeds it the emulated APU stream."
+                                               Classes="muted"
+                                               FontSize="12"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+
+                                <CheckBox x:Name="SoundEnabledCheckBox"
+                                          Content="Enable sound"
+                                          FontSize="13" />
+
+                                <Grid ColumnDefinitions="190,*,Auto" VerticalAlignment="Center">
+                                    <TextBlock Grid.Column="0" Text="Master volume" VerticalAlignment="Center" />
+                                    <Slider x:Name="VolumeSlider"
+                                            Grid.Column="1"
+                                            Minimum="0"
+                                            Maximum="100"
+                                            TickFrequency="10"
+                                            IsSnapToTickEnabled="True"
+                                            VerticalAlignment="Center"
+                                            ValueChanged="OnVolumeChanged" />
+                                    <TextBlock x:Name="VolumeText"
+                                               Grid.Column="2"
+                                               Width="54"
+                                               Text="100%"
+                                               HorizontalAlignment="Right"
+                                               TextAlignment="Right"
+                                               VerticalAlignment="Center"
+                                               Classes="muted" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="Controls">
+                <ScrollViewer>
+                    <StackPanel Margin="4,12,14,12" Spacing="14">
+                        <Border Padding="18"
+                                Background="{DynamicResource SurfaceBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="10">
+                            <StackPanel Spacing="14">
+                                <StackPanel Spacing="3">
+                                    <TextBlock Text="PLAYER 1" Classes="eyebrow" />
+                                    <TextBlock Text="Keyboard mapping" FontSize="18" FontWeight="SemiBold" />
+                                    <TextBlock Text="Configure each NES button with a key on your keyboard."
+                                               Classes="muted"
+                                               FontSize="12"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <TextBlock x:Name="ControllerSummary"
+                                           Classes="muted"
+                                           FontSize="12"
+                                           TextWrapping="Wrap" />
+                                <Button Content="Open controller setup"
+                                        HorizontalAlignment="Left"
+                                        Click="OnControllerSetupClick" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Padding="18"
+                                Background="{DynamicResource SurfaceRaisedBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="10">
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="EMULATION SHORTCUTS" Classes="eyebrow" />
+                                <TextBlock Text="F11  Toggle fullscreen    |    Space / P  Pause    |    R  Reset    |    Tab  Fast-forward"
+                                           Classes="muted"
+                                           FontSize="11"
+                                           TextWrapping="Wrap" />
+                                <TextBlock Text="Esc  Stop and return to the library    |    Ctrl+O  Open ROM"
+                                           Classes="muted"
+                                           FontSize="11"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="Library">
+                <ScrollViewer>
+                    <StackPanel Margin="4,12,14,12" Spacing="14">
+                        <Border Padding="18"
+                                Background="{DynamicResource SurfaceBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="10">
+                            <StackPanel Spacing="14">
+                                <StackPanel Spacing="3">
+                                    <TextBlock Text="GAME LIBRARY" Classes="eyebrow" />
+                                    <TextBlock Text="Choose the folder Mogiki scans for .nes files."
+                                               Classes="muted"
+                                               FontSize="12"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <TextBlock x:Name="LibraryPathText"
+                                           Text="No folder selected"
+                                           TextWrapping="Wrap"
+                                           FontSize="12" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Content="Choose folder" Click="OnChooseLibraryClick" />
+                                    <Button Content="Clear folder" Click="OnClearLibraryClick" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Padding="18"
+                                Background="{DynamicResource SurfaceRaisedBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="10">
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="RECENT GAMES" Classes="eyebrow" />
+                                <TextBlock x:Name="RecentGamesText"
+                                           Classes="muted"
+                                           FontSize="11"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+
+        <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto,Auto,Auto" VerticalAlignment="Center">
+            <Button Grid.Column="0" Content="Reset defaults" Height="36" Click="OnResetDefaultsClick" />
+            <TextBlock x:Name="SettingsStatus"
+                       Grid.Column="1"
+                       Text=""
+                       Classes="muted"
+                       FontSize="11"
+                       VerticalAlignment="Center"
+                       Margin="16,0" />
+            <Button Grid.Column="2" Content="Apply" Width="88" Height="36" Margin="0,0,8,0" Click="OnApplyClick" />
+            <Button Grid.Column="3" Classes="primary" Content="Save &amp; Close" Width="112" Height="36" Margin="0,0,8,0" Click="OnSaveClick" />
+            <Button Grid.Column="4" Content="Cancel" Width="88" Height="36" Click="OnCancelClick" />
+        </Grid>
+    </Grid>
+</Window>

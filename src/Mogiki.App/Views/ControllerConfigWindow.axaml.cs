@@ -8,6 +8,7 @@ namespace Mogiki.App.Views;
 
 public partial class ControllerConfigWindow : Window
 {
+    private readonly KeyBindings _targetBindings;
     private readonly KeyBindings _bindings;
     private Button? _activeButton;
     private string? _activeAction;
@@ -18,7 +19,8 @@ public partial class ControllerConfigWindow : Window
 
     public ControllerConfigWindow(KeyBindings bindings)
     {
-        _bindings = bindings;
+        _targetBindings = bindings;
+        _bindings = bindings.Clone();
         InitializeComponent();
 
         RefreshButtonLabels();
@@ -105,6 +107,7 @@ public partial class ControllerConfigWindow : Window
 
     private void OnSaveClick(object? sender, RoutedEventArgs e)
     {
+        _targetBindings.CopyFrom(_bindings);
         IsSaved = true;
         Close();
     }

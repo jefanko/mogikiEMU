@@ -27,6 +27,7 @@
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="16,0,12,0">
                     <Button Content="Add Games Folder" Click="OnChooseLibraryClick" />
+                    <Button Content="Settings" Click="OnSettingsClick" />
                     <Button Content="Pause" Click="OnTogglePauseClick" />
                     <Button Content="Reset" Click="OnResetClick" />
                     <Button Classes="stop" Content="Stop" Click="OnStopClick" />
@@ -49,6 +50,7 @@
 
                     <StackPanel Grid.Row="2" Spacing="4">
                         <TextBlock Text="TOOLS" Classes="eyebrow" Margin="10,0,0,8" />
+                        <Button Classes="navButton" Content="Settings" Click="OnSettingsClick" />
                         <Button Classes="navButton" Content="⚙   Controller Setup" Click="OnControllerConfigClick" />
                         <Button Classes="navButton" Content="▧   Pattern Viewer" Click="OnPatternTableClick" />
                         <Button Classes="navButton" Content="ⓘ   About Mogiki" Click="OnAboutClick" />
@@ -100,6 +102,7 @@
                             <MenuItem Header="Enable Sound" x:Name="MenuSoundEnabled" Click="OnToggleSoundClick" />
                         </MenuItem>
                         <MenuItem Header="Help">
+                            <MenuItem Header="Settings..." Click="OnSettingsClick" />
                             <MenuItem Header="Controller Configuration..." Click="OnControllerConfigClick" />
                             <MenuItem Header="About Mogiki..." Click="OnAboutClick" />
                         </MenuItem>

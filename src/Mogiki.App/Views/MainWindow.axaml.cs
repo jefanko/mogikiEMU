@@ -70,6 +70,7 @@ public partial class MainWindow : Window
         // Apply config
         ApplyAspectRatio();
         ApplyScale(_config.WindowScale);
+        UpdateMenuState();
         UpdateRecentMenu();
         if (Directory.Exists(_config.LibraryDirectory))
         {
@@ -154,6 +155,16 @@ public partial class MainWindow : Window
             item.Click += (_, _) => LoadRom(p);
             MenuRecentRoms.Items.Add(item);
         }
+    }
+
+    private void UpdateMenuState()
+    {
+        MenuBilinearFilter.Header = _config.BilinearFilter
+            ? "Smooth Bilinear Filter [On]"
+            : "Smooth Bilinear Filter [Off]";
+        MenuSoundEnabled.Header = _config.SoundEnabled
+            ? "Enable Sound [On]"
+            : "Enable Sound [Off]";
     }
 
     private void UpdateLibraryPanel()
@@ -272,6 +283,21 @@ public partial class MainWindow : Window
         return false;
     }
 
+    private void UpdateLoadedRomInfo()
+    {
+        var cart = _session.Cartridge;
+        if (cart == null || string.IsNullOrWhiteSpace(_session.RomPath))
+            return;
+
+        string name = Path.GetFileName(_session.RomPath);
+        string renderer = _sdlRenderer?.IsAvailable == true
+            ? $"SDL3 GPU ({_sdlRenderer.BackendName})"
+            : "Avalonia bitmap";
+        TxtRomInfo.Text =
+            $"{name} | Mapper {cart.MapperId} | PRG: {cart.PrgBanks * 16}KB | " +
+            $"CHR: {cart.ChrBanks * 8}KB | {cart.Mirror} | {renderer}";
+    }
+
     private async void OnOpenRomClick(object? sender, RoutedEventArgs e)
     {
         var topLevel = GetTopLevel(this);
@@ -359,18 +385,25 @@ public partial class MainWindow : Window
 
     private void ShowGameWindow(string gameName)
     {
-        _sdlRenderer ??= CreateSdlRenderer();
-        if (_sdlRenderer.TryStart(
-                $"Mogiki - {gameName}",
-                (int)GameScreen.Width,
-                (int)GameScreen.Height,
-                _config.WindowScale,
-                _config.BilinearFilter))
+        if (!string.Equals(_config.RendererBackend, "avalonia", StringComparison.OrdinalIgnoreCase))
         {
-            _sdlRenderer.SetBilinearFilter(_config.BilinearFilter);
-            return;
+            _sdlRenderer ??= CreateSdlRenderer();
+            bool rendererWasAvailable = _sdlRenderer.IsAvailable;
+            if (_sdlRenderer.TryStart(
+                    $"Mogiki - {gameName}",
+                    (int)GameScreen.Width,
+                    (int)GameScreen.Height,
+                    _config.WindowScale,
+                    _config.BilinearFilter))
+            {
+                _sdlRenderer.SetBilinearFilter(_config.BilinearFilter);
+                if (_config.StartFullscreen && !rendererWasAvailable)
+                    _sdlRenderer.ToggleFullscreen();
+                return;
+            }
         }
 
+        bool gameWindowWasVisible = _gameWindow?.IsVisible == true;
         if (_gameWindow == null)
         {
             var window = new GameWindow(_screenBitmap, GameScreen.Width, GameScreen.Height);
@@ -391,6 +424,8 @@ public partial class MainWindow : Window
         }
 
         _gameWindow.Activate();
+        if (_config.StartFullscreen && !gameWindowWasVisible)
+            _gameWindow.ToggleFullscreen();
     }
 
     private void CloseGameWindow()
@@ -593,12 +628,62 @@ public partial class MainWindow : Window
             _config.BilinearFilter ? BitmapInterpolationMode.LowQuality : BitmapInterpolationMode.None);
         _gameWindow?.SetBilinearFilter(_config.BilinearFilter);
         _sdlRenderer?.SetBilinearFilter(_config.BilinearFilter);
+        UpdateMenuState();
     }
 
     private void OnToggleSoundClick(object? sender, RoutedEventArgs e)
     {
         _config.SoundEnabled = !_config.SoundEnabled;
         _emulation.SoundEnabled = _config.SoundEnabled;
+        UpdateMenuState();
+    }
+
+    private async void OnSettingsClick(object? sender, RoutedEventArgs e)
+    {
+        bool wasPaused = _emulation.IsPaused;
+        _emulation.IsPaused = true;
+
+        var dialog = new SettingsWindow(_config);
+        dialog.SettingsApplied += ApplySettings;
+        await dialog.ShowDialog(this);
+
+        _emulation.IsPaused = wasPaused;
+    }
+
+    private void ApplySettings(AppConfig updated)
+    {
+        string previousBackend = _config.RendererBackend;
+        string previousLibrary = _config.LibraryDirectory;
+
+        _config.CopyFrom(updated);
+        _emulation.SoundEnabled = _config.SoundEnabled;
+        _emulation.Volume = _config.Volume;
+
+        ApplyAspectRatio();
+        ApplyScale(_config.WindowScale);
+        RenderOptions.SetBitmapInterpolationMode(
+            GameScreen,
+            _config.BilinearFilter ? BitmapInterpolationMode.LowQuality : BitmapInterpolationMode.None);
+        _gameWindow?.SetBilinearFilter(_config.BilinearFilter);
+        _sdlRenderer?.SetBilinearFilter(_config.BilinearFilter);
+
+        if (!string.Equals(previousLibrary, _config.LibraryDirectory, StringComparison.OrdinalIgnoreCase))
+            ScanLibraryDirectory(_config.LibraryDirectory, persist: false);
+        else
+            UpdateLibraryPanel();
+
+        if (_emulation.IsRomLoaded
+            && !string.Equals(previousBackend, _config.RendererBackend, StringComparison.OrdinalIgnoreCase))
+        {
+            string gameName = Path.GetFileName(_session.RomPath ?? "game.nes");
+            CloseGameWindow();
+            ShowGameWindow(gameName);
+        }
+
+        UpdateRecentMenu();
+        UpdateMenuState();
+        UpdateLoadedRomInfo();
+        _config.Save("config.ini");
     }
 
     private async void OnControllerConfigClick(object? sender, RoutedEventArgs e)
