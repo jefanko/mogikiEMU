@@ -26,6 +26,8 @@ The core follows an **accuracy-first, bus-centric architecture**, simulating the
 ### 🖥️ Modern Avalonia UI
 - **Dark Fluent Theme**: Clean modern aesthetics powered by `Avalonia.Themes.Fluent` with Inter typography and custom status pills.
 - **Hardware-Accelerated Viewport**: High-performance 60.1 FPS direct memory blitting via `WriteableBitmap`.
+- **Dedicated Game Window**: Games open in their own window, with `F11` fullscreen and `Escape` to stop and return to the library.
+- **SDL3 Audio Output**: Stream-based, batched float audio with explicit pause/resume and graceful fallback when SDL3 is unavailable.
 - **Drag & Drop**: Drag any `.nes` ROM file from Windows Explorer directly onto the emulator window to launch immediately.
 - **Recent ROMs Menu**: Automatically tracks and remembers your last 10 games.
 - **Aspect Ratio Controls**:
@@ -67,6 +69,8 @@ The core follows an **accuracy-first, bus-centric architecture**, simulating the
 | **Select** | `A` | Select / Item |
 | **Open ROM** | `Ctrl + O` / `F1` | Open file picker dialog |
 | **Pause / Resume** | `Space` / `P` | Pause emulation |
+| **Stop / Return to Library** | `Escape` | Close the game window and return to the launcher |
+| **Fullscreen** | `F11` | Toggle fullscreen for the dedicated game window |
 | **Reset** | `Ctrl + R` | Reset system |
 | **Fast Forward** | `Tab` | Turbo speed |
 | **Screenshot** | `F12` | Save screenshot PNG |

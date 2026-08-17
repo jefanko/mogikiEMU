@@ -36,6 +36,10 @@ public partial class MainWindow : Window
     private volatile bool _fastForward = false;
     private volatile bool _renderPending = false;
 
+    private GameWindow? _gameWindow;
+    private bool _closingGameWindow;
+
+    private readonly List<string> _libraryRoms = [];
     private byte _controllerState;
     private int _renderedFrames;
     private double _currentFps;
@@ -67,6 +71,14 @@ public partial class MainWindow : Window
         ApplyAspectRatio();
         ApplyScale(_config.WindowScale);
         UpdateRecentMenu();
+        if (Directory.Exists(_config.LibraryDirectory))
+        {
+            ScanLibraryDirectory(_config.LibraryDirectory, persist: false);
+        }
+        else
+        {
+            UpdateLibraryPanel();
+        }
 
         // Drag & Drop
         AddHandler(DragDrop.DropEvent, OnDropHandler);
@@ -90,10 +102,8 @@ public partial class MainWindow : Window
         {
             LoadRom(initialRom);
         }
-        else if (!string.IsNullOrEmpty(_config.LastRomPath) && File.Exists(_config.LastRomPath))
-        {
-            LoadRom(_config.LastRomPath);
-        }
+        // Always open on the library screen. A previously played ROM should not
+        // start until the user explicitly selects it from the launcher UI.
     }
 
     private void ApplyAspectRatio()
@@ -113,6 +123,8 @@ public partial class MainWindow : Window
                 GameScreen.Height = 240;
                 break;
         }
+
+        _gameWindow?.SetLogicalSize(GameScreen.Width, GameScreen.Height);
     }
 
     private void ApplyScale(int scale)
@@ -123,24 +135,102 @@ public partial class MainWindow : Window
 
         Width = Math.Max(targetW, 512);
         Height = Math.Max(targetH, 480);
+
+        _gameWindow?.ApplyScale(_config.WindowScale, GameScreen.Width, GameScreen.Height);
     }
 
     private void UpdateRecentMenu()
     {
         MenuRecentRoms.Items.Clear();
-        if (_config.RecentRoms.Count == 0)
+
+        var recentPaths = _config.RecentRoms
+            .Where(File.Exists)
+            .ToList();
+
+        if (recentPaths.Count == 0)
         {
             MenuRecentRoms.Items.Add(new MenuItem { Header = "No Recent Files", IsEnabled = false });
             return;
         }
 
-        foreach (var path in _config.RecentRoms)
+        foreach (var path in recentPaths)
         {
             string p = path;
             var item = new MenuItem { Header = Path.GetFileName(p) };
             item.Click += (_, _) => LoadRom(p);
             MenuRecentRoms.Items.Add(item);
         }
+    }
+
+    private void UpdateLibraryPanel()
+    {
+        LibraryGamesPanel.Children.Clear();
+
+        bool hasDirectory = !string.IsNullOrWhiteSpace(_config.LibraryDirectory)
+            && Directory.Exists(_config.LibraryDirectory);
+
+        var paths = hasDirectory
+            ? _libraryRoms
+            : _config.RecentRoms.Where(File.Exists).Take(10).ToList();
+
+        LibraryDirectoryText.Text = hasDirectory
+            ? _config.LibraryDirectory
+            : "No game folder selected";
+
+        LibraryEmptyText.Text = hasDirectory
+            ? "No .nes games found in this folder."
+            : paths.Count == 0
+                ? "Choose Add Games Folder to build your library."
+                : "Recent games are shown here until you choose a folder.";
+
+        LibraryEmptyText.IsVisible = paths.Count == 0;
+        LibraryGamesPanel.IsVisible = paths.Count > 0;
+
+        foreach (var path in paths)
+        {
+            var gameButton = new Button
+            {
+                Content = Path.GetFileNameWithoutExtension(path),
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch,
+                HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Left,
+                Padding = new Thickness(10, 8),
+                FontSize = 11
+            };
+            gameButton.Click += (_, _) => LoadRom(path);
+            LibraryGamesPanel.Children.Add(gameButton);
+        }
+    }
+
+    private void ScanLibraryDirectory(string directory, bool persist)
+    {
+        _libraryRoms.Clear();
+
+        if (!Directory.Exists(directory))
+        {
+            _config.LibraryDirectory = "";
+            UpdateLibraryPanel();
+            return;
+        }
+
+        try
+        {
+            _libraryRoms.AddRange(
+                Directory.EnumerateFiles(directory, "*.nes", SearchOption.AllDirectories)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(path => Path.GetFileNameWithoutExtension(path), StringComparer.OrdinalIgnoreCase));
+
+            _config.LibraryDirectory = directory;
+            if (persist)
+            {
+                _config.Save("config.ini");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error scanning game directory: {ex.Message}");
+        }
+
+        UpdateLibraryPanel();
     }
 
     public bool LoadRom(string path)
@@ -165,10 +255,14 @@ public partial class MainWindow : Window
 
                     Dispatcher.UIThread.Post(() =>
                     {
+                        UpdateLibraryPanel();
                         WelcomeOverlay.IsVisible = false;
+                        GameViewbox.IsVisible = false;
+                        DetachedGameOverlay.IsVisible = true;
                         UpdateRecentMenu();
                         string name = Path.GetFileName(path);
                         Title = $"Mogiki NES - {name} (Mapper {cart.MapperId})";
+                        ShowGameWindow(name);
                         TxtStatus.Text = "● RUNNING";
                         TxtStatus.Foreground = new SolidColorBrush(Color.Parse("#4ADE80"));
                         TxtRomInfo.Text = $"{name} • Mapper {cart.MapperId} • PRG: {cart.PrgBanks * 16}KB • CHR: {cart.ChrBanks * 8}KB • {cart.Mirror}";
@@ -212,6 +306,27 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnChooseLibraryClick(object? sender, RoutedEventArgs e)
+    {
+        var topLevel = GetTopLevel(this);
+        if (topLevel == null) return;
+
+        var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "Select NES game directory",
+            AllowMultiple = false
+        });
+
+        if (folders.Count > 0)
+        {
+            string? path = folders[0].TryGetLocalPath();
+            if (!string.IsNullOrEmpty(path))
+            {
+                ScanLibraryDirectory(path, persist: true);
+            }
+        }
+    }
+
     private void OnTogglePauseClick(object? sender, RoutedEventArgs e)
     {
         if (!_romLoaded) return;
@@ -225,6 +340,98 @@ public partial class MainWindow : Window
                 ? new SolidColorBrush(Color.Parse("#FACC15"))
                 : new SolidColorBrush(Color.Parse("#4ADE80"));
         });
+    }
+
+    private void OnStopClick(object? sender, RoutedEventArgs e) => StopAndReturnToLibrary();
+
+    private void StopAndReturnToLibrary()
+    {
+        if (!_romLoaded) return;
+
+        // The emulation loop remains alive for the next game, but no longer
+        // clocks the bus while the launcher/library is visible.
+        _isPaused = true;
+        _romLoaded = false;
+        _controllerState = 0;
+        _audio.Pause(true);
+        CloseGameWindow();
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            UpdateLibraryPanel();
+            GameViewbox.IsVisible = false;
+            DetachedGameOverlay.IsVisible = false;
+            WelcomeOverlay.IsVisible = true;
+            Title = "Mogiki NES Emulator";
+            TxtStatus.Text = "NO ROM LOADED";
+            TxtStatus.Foreground = new SolidColorBrush(Color.Parse("#98A0AA"));
+            TxtFps.Text = "0.0 FPS";
+            TxtRomInfo.Text = "Select a game from the library";
+        });
+    }
+
+    private void ShowGameWindow(string gameName)
+    {
+        if (_gameWindow == null)
+        {
+            var window = new GameWindow(_screenBitmap, GameScreen.Width, GameScreen.Height);
+            window.GameKeyDown += OnGameWindowKeyDown;
+            window.GameKeyUp += OnGameWindowKeyUp;
+            window.Closed += OnGameWindowClosed;
+            _gameWindow = window;
+        }
+
+        _gameWindow.SetLogicalSize(GameScreen.Width, GameScreen.Height);
+        _gameWindow.ApplyScale(_config.WindowScale, GameScreen.Width, GameScreen.Height);
+        _gameWindow.SetBilinearFilter(_config.BilinearFilter);
+        _gameWindow.Title = $"Mogiki - {gameName}";
+
+        if (!_gameWindow.IsVisible)
+        {
+            _gameWindow.Show();
+        }
+
+        _gameWindow.Activate();
+    }
+
+    private void CloseGameWindow()
+    {
+        var window = _gameWindow;
+        _gameWindow = null;
+        if (window == null)
+            return;
+
+        _closingGameWindow = true;
+        window.Close();
+        _closingGameWindow = false;
+    }
+
+    private void OnGameWindowClosed(object? sender, EventArgs e)
+    {
+        if (ReferenceEquals(sender, _gameWindow))
+        {
+            _gameWindow = null;
+        }
+
+        if (!_closingGameWindow && _romLoaded)
+        {
+            StopAndReturnToLibrary();
+        }
+    }
+
+    private void OnToggleFullscreenClick(object? sender, RoutedEventArgs e)
+    {
+        _gameWindow?.ToggleFullscreen();
+    }
+
+    private void OnGameWindowKeyDown(object? sender, KeyEventArgs e)
+    {
+        OnKeyDownHandler(sender, e);
+    }
+
+    private void OnGameWindowKeyUp(object? sender, KeyEventArgs e)
+    {
+        OnKeyUpHandler(sender, e);
     }
 
     private void OnResetClick(object? sender, RoutedEventArgs e)
@@ -265,6 +472,7 @@ public partial class MainWindow : Window
         _config.BilinearFilter = !_config.BilinearFilter;
         RenderOptions.SetBitmapInterpolationMode(GameScreen,
             _config.BilinearFilter ? BitmapInterpolationMode.LowQuality : BitmapInterpolationMode.None);
+        _gameWindow?.SetBilinearFilter(_config.BilinearFilter);
     }
 
     private void OnToggleSoundClick(object? sender, RoutedEventArgs e)
@@ -350,6 +558,12 @@ public partial class MainWindow : Window
     private void OnKeyDownHandler(object? sender, KeyEventArgs e)
     {
         var k = e.Key;
+        if (k == Key.F11)
+        {
+            OnToggleFullscreenClick(null, null!);
+            e.Handled = true;
+            return;
+        }
         if (k == Key.F1 || (k == Key.O && e.KeyModifiers.HasFlag(KeyModifiers.Control)))
         {
             OnOpenRomClick(null, null!);
@@ -365,6 +579,12 @@ public partial class MainWindow : Window
         if (k == Key.Space || k == Key.P)
         {
             OnTogglePauseClick(null, null!);
+            e.Handled = true;
+            return;
+        }
+        if (k == Key.Escape)
+        {
+            OnStopClick(null, null!);
             e.Handled = true;
             return;
         }
@@ -466,6 +686,7 @@ public partial class MainWindow : Window
                     Dispatcher.UIThread.Post(() =>
                     {
                         GameScreen.InvalidateVisual();
+                        _gameWindow?.InvalidateGameScreen();
                         _renderPending = false;
                     }, DispatcherPriority.Render);
                 }
@@ -500,6 +721,7 @@ public partial class MainWindow : Window
 
     private void OnWindowClosed(object? sender, EventArgs e)
     {
+        CloseGameWindow();
         _isRunning = false;
         _emulationThread.Join(500);
         _audio.Dispose();

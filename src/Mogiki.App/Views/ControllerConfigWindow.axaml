@@ -3,61 +3,62 @@
         x:Class="Mogiki.App.Views.ControllerConfigWindow"
         Title="Controller Configuration - Player 1"
         Icon="/Assets/mgkEMU.png"
-        Width="440" Height="520"
+        Width="520" Height="610"
         CanResize="False"
         WindowStartupLocation="CenterOwner"
-        Background="#18181C"
+        Background="{DynamicResource AppBackgroundBrush}"
         KeyDown="OnKeyDownHandler">
 
-    <Grid RowDefinitions="Auto, *, Auto" Margin="24">
+    <Grid RowDefinitions="Auto, *, Auto" Margin="28">
         <!-- Header -->
-        <StackPanel Grid.Row="0" Spacing="4">
-            <TextBlock Text="Player 1 Controls" FontSize="20" FontWeight="Bold" Foreground="#38BDF8" />
-            <TextBlock Text="Click any button, then press a key on your keyboard to assign." FontSize="12" Foreground="#94A3B8" />
+        <StackPanel Grid.Row="0" Spacing="5">
+            <TextBlock Text="CONTROLLER SETUP" Classes="eyebrow" />
+            <TextBlock Text="Player 1 controls" FontSize="24" FontWeight="SemiBold" />
+            <TextBlock Text="Choose an input, then press a key on your keyboard to assign it." Classes="muted" FontSize="12" />
         </StackPanel>
 
         <!-- Mapping List -->
-        <Border Grid.Row="1" Margin="0,16,0,16" Padding="16" Background="#222228" CornerRadius="8" BorderBrush="#33333E" BorderThickness="1">
-            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnDefinitions="*, 140">
+        <Border Grid.Row="1" Margin="0,22,0,22" Padding="18" Background="{DynamicResource SurfaceBrush}" CornerRadius="10" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnDefinitions="*, 170">
                 <!-- D-Pad Up -->
-                <TextBlock Grid.Row="0" Grid.Column="0" Text="D-Pad Up" VerticalAlignment="Center" Foreground="#E2E8F0" FontSize="14" Margin="0,6" />
-                <Button Grid.Row="0" Grid.Column="1" x:Name="BtnUp" Content="Up" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,4" Background="#2D2D36" Foreground="White" CornerRadius="6" Click="OnKeyButtonClick" Tag="Up" />
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="D-Pad Up" VerticalAlignment="Center" Classes="muted" FontSize="13" Margin="0,6" />
+                <Button Grid.Row="0" Grid.Column="1" x:Name="BtnUp" Content="Up" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,4" Click="OnKeyButtonClick" Tag="Up" />
 
                 <!-- D-Pad Down -->
-                <TextBlock Grid.Row="1" Grid.Column="0" Text="D-Pad Down" VerticalAlignment="Center" Foreground="#E2E8F0" FontSize="14" Margin="0,6" />
-                <Button Grid.Row="1" Grid.Column="1" x:Name="BtnDown" Content="Down" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,4" Background="#2D2D36" Foreground="White" CornerRadius="6" Click="OnKeyButtonClick" Tag="Down" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="D-Pad Down" VerticalAlignment="Center" Classes="muted" FontSize="13" Margin="0,6" />
+                <Button Grid.Row="1" Grid.Column="1" x:Name="BtnDown" Content="Down" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,4" Click="OnKeyButtonClick" Tag="Down" />
 
                 <!-- D-Pad Left -->
-                <TextBlock Grid.Row="2" Grid.Column="0" Text="D-Pad Left" VerticalAlignment="Center" Foreground="#E2E8F0" FontSize="14" Margin="0,6" />
-                <Button Grid.Row="2" Grid.Column="1" x:Name="BtnLeft" Content="Left" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,4" Background="#2D2D36" Foreground="White" CornerRadius="6" Click="OnKeyButtonClick" Tag="Left" />
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="D-Pad Left" VerticalAlignment="Center" Classes="muted" FontSize="13" Margin="0,6" />
+                <Button Grid.Row="2" Grid.Column="1" x:Name="BtnLeft" Content="Left" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,4" Click="OnKeyButtonClick" Tag="Left" />
 
                 <!-- D-Pad Right -->
-                <TextBlock Grid.Row="3" Grid.Column="0" Text="D-Pad Right" VerticalAlignment="Center" Foreground="#E2E8F0" FontSize="14" Margin="0,6" />
-                <Button Grid.Row="3" Grid.Column="1" x:Name="BtnRight" Content="Right" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,4" Background="#2D2D36" Foreground="White" CornerRadius="6" Click="OnKeyButtonClick" Tag="Right" />
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="D-Pad Right" VerticalAlignment="Center" Classes="muted" FontSize="13" Margin="0,6" />
+                <Button Grid.Row="3" Grid.Column="1" x:Name="BtnRight" Content="Right" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,4" Click="OnKeyButtonClick" Tag="Right" />
 
                 <!-- A Button -->
-                <TextBlock Grid.Row="4" Grid.Column="0" Text="A Button" VerticalAlignment="Center" Foreground="#E2E8F0" FontSize="14" Margin="0,6" />
-                <Button Grid.Row="4" Grid.Column="1" x:Name="BtnA" Content="X" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,4" Background="#2D2D36" Foreground="White" CornerRadius="6" Click="OnKeyButtonClick" Tag="A" />
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="A Button" VerticalAlignment="Center" Classes="muted" FontSize="13" Margin="0,6" />
+                <Button Grid.Row="4" Grid.Column="1" x:Name="BtnA" Content="X" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,4" Click="OnKeyButtonClick" Tag="A" />
 
                 <!-- B Button -->
-                <TextBlock Grid.Row="5" Grid.Column="0" Text="B Button" VerticalAlignment="Center" Foreground="#E2E8F0" FontSize="14" Margin="0,6" />
-                <Button Grid.Row="5" Grid.Column="1" x:Name="BtnB" Content="Z" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,4" Background="#2D2D36" Foreground="White" CornerRadius="6" Click="OnKeyButtonClick" Tag="B" />
+                <TextBlock Grid.Row="5" Grid.Column="0" Text="B Button" VerticalAlignment="Center" Classes="muted" FontSize="13" Margin="0,6" />
+                <Button Grid.Row="5" Grid.Column="1" x:Name="BtnB" Content="Z" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,4" Click="OnKeyButtonClick" Tag="B" />
 
                 <!-- Start -->
-                <TextBlock Grid.Row="6" Grid.Column="0" Text="Start Button" VerticalAlignment="Center" Foreground="#E2E8F0" FontSize="14" Margin="0,6" />
-                <Button Grid.Row="6" Grid.Column="1" x:Name="BtnStart" Content="S" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,4" Background="#2D2D36" Foreground="White" CornerRadius="6" Click="OnKeyButtonClick" Tag="Start" />
+                <TextBlock Grid.Row="6" Grid.Column="0" Text="Start Button" VerticalAlignment="Center" Classes="muted" FontSize="13" Margin="0,6" />
+                <Button Grid.Row="6" Grid.Column="1" x:Name="BtnStart" Content="S" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,4" Click="OnKeyButtonClick" Tag="Start" />
 
                 <!-- Select -->
-                <TextBlock Grid.Row="7" Grid.Column="0" Text="Select Button" VerticalAlignment="Center" Foreground="#E2E8F0" FontSize="14" Margin="0,6" />
-                <Button Grid.Row="7" Grid.Column="1" x:Name="BtnSelect" Content="A" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,4" Background="#2D2D36" Foreground="White" CornerRadius="6" Click="OnKeyButtonClick" Tag="Select" />
+                <TextBlock Grid.Row="7" Grid.Column="0" Text="Select Button" VerticalAlignment="Center" Classes="muted" FontSize="13" Margin="0,6" />
+                <Button Grid.Row="7" Grid.Column="1" x:Name="BtnSelect" Content="A" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,4" Click="OnKeyButtonClick" Tag="Select" />
             </Grid>
         </Border>
 
         <!-- Actions -->
         <Grid Grid.Row="2" ColumnDefinitions="Auto, *, Auto, Auto">
-            <Button Grid.Column="0" Content="Reset Defaults" Height="34" CornerRadius="6" Background="#33333E" Foreground="#CBD5E1" Click="OnResetDefaultsClick" />
-            <Button Grid.Column="2" Content="Save" Width="80" Height="34" Margin="0,0,8,0" CornerRadius="6" Background="#0284C7" Foreground="White" Click="OnSaveClick" />
-            <Button Grid.Column="3" Content="Cancel" Width="80" Height="34" CornerRadius="6" Background="#33333E" Foreground="#CBD5E1" Click="OnCancelClick" />
+            <Button Grid.Column="0" Content="Reset Defaults" Height="36" Click="OnResetDefaultsClick" />
+            <Button Grid.Column="2" Classes="primary" Content="Save" Width="88" Height="36" Margin="0,0,8,0" Click="OnSaveClick" />
+            <Button Grid.Column="3" Content="Cancel" Width="88" Height="36" Click="OnCancelClick" />
         </Grid>
     </Grid>
 </Window>

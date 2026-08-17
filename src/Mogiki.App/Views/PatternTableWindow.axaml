@@ -3,16 +3,21 @@
         x:Class="Mogiki.App.Views.PatternTableWindow"
         Title="Pattern Table (CHR ROM) Viewer"
         Icon="/Assets/mgkEMU.png"
-        Width="560" Height="360"
+        Width="620" Height="420"
         CanResize="False"
         WindowStartupLocation="CenterOwner"
-        Background="#18181C">
+        Background="{DynamicResource AppBackgroundBrush}">
 
-    <Grid RowDefinitions="Auto, *" Margin="20">
+    <Grid RowDefinitions="Auto, *" Margin="28">
         <!-- Palette Selection -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12" Margin="0,0,0,16">
-            <TextBlock Text="Palette:" VerticalAlignment="Center" Foreground="#E2E8F0" FontSize="13" />
-            <ComboBox x:Name="ComboPalette" Width="140" SelectionChanged="OnPaletteChanged">
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,18">
+            <StackPanel Spacing="4">
+                <TextBlock Text="TOOLS / PATTERN VIEWER" Classes="eyebrow" />
+                <TextBlock Text="CHR pattern table" FontSize="22" FontWeight="SemiBold" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <TextBlock Text="Palette" Classes="muted" VerticalAlignment="Center" FontSize="12" />
+                <ComboBox x:Name="ComboPalette" Width="140" SelectionChanged="OnPaletteChanged">
                 <ComboBoxItem Content="Palette 0" />
                 <ComboBoxItem Content="Palette 1" />
                 <ComboBoxItem Content="Palette 2" />
@@ -21,11 +26,12 @@
                 <ComboBoxItem Content="Palette 5" />
                 <ComboBoxItem Content="Palette 6" />
                 <ComboBoxItem Content="Palette 7" />
-            </ComboBox>
-        </StackPanel>
+                </ComboBox>
+            </StackPanel>
+        </Grid>
 
         <!-- Viewer Image -->
-        <Border Grid.Row="1" Background="Black" CornerRadius="8" BorderBrush="#33333E" BorderThickness="1" Padding="4">
+        <Border Grid.Row="1" Background="Black" CornerRadius="10" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="8">
             <Image x:Name="ImgPattern" Width="512" Height="256" Stretch="Fill"
                    RenderOptions.BitmapInterpolationMode="None" />
         </Border>

@@ -26,6 +26,7 @@ public sealed class AppConfig
     public KeyBindings Keys { get; set; } = new();
     public int WindowScale { get; set; } = 3;
     public string LastRomPath { get; set; } = "";
+    public string LibraryDirectory { get; set; } = "";
     public List<string> RecentRoms { get; set; } = [];
     public AspectRatioMode AspectRatio { get; set; } = AspectRatioMode.Standard4_3;
     public bool BilinearFilter { get; set; } = false;
@@ -95,6 +96,10 @@ public sealed class AppConfig
                     LastRomPath = val;
                     break;
 
+                case "library":
+                    LibraryDirectory = val;
+                    break;
+
                 case "recent":
                     if (File.Exists(val) && !RecentRoms.Contains(val))
                         RecentRoms.Add(val);
@@ -128,6 +133,7 @@ public sealed class AppConfig
         writer.WriteLine();
         writer.WriteLine("[Recent]");
         writer.WriteLine($"lastrom={LastRomPath}");
+        writer.WriteLine($"library={LibraryDirectory}");
         foreach (var recent in RecentRoms)
         {
             writer.WriteLine($"recent={recent}");
