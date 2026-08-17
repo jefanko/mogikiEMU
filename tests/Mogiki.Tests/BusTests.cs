@@ -72,10 +72,62 @@ public class BusTests
         Assert.Equal(0, bus.Read(0x4016));
         // Bit 4 (Start) = 1
         Assert.Equal(1, bus.Read(0x4016));
-        // Remaining = 0
+        // The remaining four button bits are released.
         Assert.Equal(0, bus.Read(0x4016));
         Assert.Equal(0, bus.Read(0x4016));
         Assert.Equal(0, bus.Read(0x4016));
         Assert.Equal(0, bus.Read(0x4016));
+
+        // NES controller reads return 1 after the eight-button shift.
+        Assert.Equal(1, bus.Read(0x4016));
+    }
+
+    [Fact]
+    public void Bus_ControllerStrobeHigh_ContinuesToExposeAButton()
+    {
+        var bus = new Bus();
+        bus.Controller[0] = 0x80;
+
+        bus.Write(0x4016, 1);
+        Assert.Equal(1, bus.Read(0x4016));
+        Assert.Equal(1, bus.Read(0x4016));
+
+        bus.Controller[0] = 0x00;
+        Assert.Equal(0, bus.Read(0x4016));
+    }
+
+    [Fact]
+    public void Bus_ControllerFallingEdge_LatchesBothPorts()
+    {
+        var bus = new Bus();
+        bus.Controller[0] = 0x80;
+        bus.Controller[1] = 0x80;
+
+        bus.Write(0x4016, 1);
+        bus.Write(0x4016, 0);
+
+        bus.Controller[0] = 0x00;
+        bus.Controller[1] = 0x00;
+
+        Assert.Equal(1, bus.Read(0x4016));
+        Assert.Equal(1, bus.Read(0x4017));
+    }
+
+    [Fact]
+    public void Bus_ControllerDoesNotRelatchUntilNextStrobe()
+    {
+        var bus = new Bus();
+        bus.Controller[0] = 0x80;
+
+        bus.Write(0x4016, 1);
+        bus.Write(0x4016, 0);
+        Assert.Equal(1, bus.Read(0x4016));
+
+        bus.Controller[0] = 0x80;
+        Assert.Equal(0, bus.Read(0x4016));
+
+        bus.Write(0x4016, 1);
+        bus.Write(0x4016, 0);
+        Assert.Equal(1, bus.Read(0x4016));
     }
 }

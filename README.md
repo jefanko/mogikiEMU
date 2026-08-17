@@ -79,6 +79,25 @@ The core follows an **accuracy-first, bus-centric architecture**, simulating the
 
 ---
 
+## Runtime and rendering architecture
+
+The launcher owns the UI only. `EmulatorSession` owns the NES bus and
+cartridge lifetime, while `EmulationRunner` clocks it on a dedicated thread.
+Completed PPU frames are exchanged through a two-slot ownership pipeline, so
+the presenter never reads a buffer while the emulator is writing it.
+
+The dedicated game window prefers `Sdl3GpuRenderer`. It uploads the 256x240
+frame to a streaming SDL3 texture and lets SDL choose an accelerated backend
+(Vulkan, OpenGL, Direct3D, or the available fallback). Set
+`renderer=opengl`, `renderer=vulkan`, or `renderer=auto` in `config.ini`.
+Avalonia remains the fallback when SDL3 or the requested backend is unavailable.
+
+## ROM regression tests
+
+`dotnet test` runs the canonical `nestest` CPU trace, official instruction and
+PPU VBL ROM smoke tests, controller strobe timing tests, and frame-pipeline
+ownership tests. The ROM inputs and SHA-256 records live under `tests/Roms`.
+
 ## 🚀 Getting Started & Building
 
 ### Prerequisites

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
@@ -9,10 +8,10 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
-using Mogiki.App.Audio;
 using Mogiki.App.Config;
-using Mogiki.Core.Bus;
-using Mogiki.Core.Cartridge;
+using Mogiki.App.Emulation;
+using Mogiki.App.Video;
+using Mogiki.Core.Video;
 
 namespace Mogiki.App.Views;
 
@@ -25,26 +24,19 @@ public partial class MainWindow : Window
     private static extern uint TimeEndPeriod(uint uMilliseconds);
 
     private readonly AppConfig _config = new();
-    private readonly Bus _bus = new();
-    private readonly AudioEngine _audio = new();
+    private readonly EmulatorSession _session;
+    private readonly FrameBufferPipeline _framePipeline;
+    private readonly EmulationRunner _emulation;
 
     private readonly WriteableBitmap _screenBitmap;
-    private readonly Thread _emulationThread;
-    private volatile bool _isRunning = true;
-    private volatile bool _isPaused = false;
-    private volatile bool _romLoaded = false;
-    private volatile bool _fastForward = false;
-    private volatile bool _renderPending = false;
+    private int _renderPending;
 
     private GameWindow? _gameWindow;
+    private Sdl3GpuRenderer? _sdlRenderer;
     private bool _closingGameWindow;
 
     private readonly List<string> _libraryRoms = [];
     private byte _controllerState;
-    private int _renderedFrames;
-    private double _currentFps;
-    private readonly Stopwatch _fpsStopwatch = Stopwatch.StartNew();
-    private readonly object _renderLock = new();
 
     public MainWindow() : this(null) { }
 
@@ -56,6 +48,14 @@ public partial class MainWindow : Window
         }
 
         _config.Load("config.ini");
+        _session = new EmulatorSession();
+        _framePipeline = new FrameBufferPipeline();
+        _emulation = new EmulationRunner(_session, _framePipeline);
+        _emulation.SoundEnabled = _config.SoundEnabled;
+        _emulation.Volume = _config.Volume;
+        _emulation.FrameReady += OnFrameReady;
+        _emulation.FpsUpdated += OnFpsUpdated;
+        _emulation.Faulted += OnEmulationFaulted;
 
         _screenBitmap = new WriteableBitmap(
             new PixelSize(256, 240),
@@ -84,17 +84,9 @@ public partial class MainWindow : Window
         AddHandler(DragDrop.DropEvent, OnDropHandler);
         AddHandler(DragDrop.DragOverEvent, OnDragOverHandler);
 
-        // Audio initialization
-        _audio.Init();
-
-        // Background emulation thread
-        _emulationThread = new Thread(EmulationLoop)
-        {
-            IsBackground = true,
-            Name = "Mogiki Emulation Thread",
-            Priority = ThreadPriority.Highest
-        };
-        _emulationThread.Start();
+        // Start the runtime after the launcher is ready. It remains idle until
+        // a game is selected from the library.
+        _emulation.Start();
 
         Closed += OnWindowClosed;
 
@@ -125,6 +117,7 @@ public partial class MainWindow : Window
         }
 
         _gameWindow?.SetLogicalSize(GameScreen.Width, GameScreen.Height);
+        _sdlRenderer?.SetLogicalSize((int)GameScreen.Width, (int)GameScreen.Height);
     }
 
     private void ApplyScale(int scale)
@@ -137,6 +130,7 @@ public partial class MainWindow : Window
         Height = Math.Max(targetH, 480);
 
         _gameWindow?.ApplyScale(_config.WindowScale, GameScreen.Width, GameScreen.Height);
+        _sdlRenderer?.ApplyScale(_config.WindowScale);
     }
 
     private void UpdateRecentMenu()
@@ -240,37 +234,35 @@ public partial class MainWindow : Window
 
         try
         {
-            lock (_renderLock)
+            if (!_emulation.LoadRom(path))
+                return false;
+
+            var cart = _session.Cartridge;
+            if (cart == null)
+                return false;
+
+            _config.LastRomPath = path;
+            _config.AddRecentRom(path);
+
+            Dispatcher.UIThread.Post(() =>
             {
-                var cart = new Cartridge(path);
-                if (cart.ImageValid)
-                {
-                    _bus.InsertCartridge(cart);
-                    _bus.Reset();
-                    _audio.Reset();
-                    _romLoaded = true;
-                    _isPaused = false;
-                    _config.LastRomPath = path;
-                    _config.AddRecentRom(path);
+                UpdateLibraryPanel();
+                WelcomeOverlay.IsVisible = false;
+                GameViewbox.IsVisible = false;
+                DetachedGameOverlay.IsVisible = true;
+                UpdateRecentMenu();
+                string name = Path.GetFileName(path);
+                Title = $"Mogiki NES - {name} (Mapper {cart.MapperId})";
+                ShowGameWindow(name);
+                TxtStatus.Text = "● RUNNING";
+                TxtStatus.Foreground = new SolidColorBrush(Color.Parse("#4ADE80"));
+                string renderer = _sdlRenderer?.IsAvailable == true
+                    ? $"SDL3 GPU ({_sdlRenderer.BackendName})"
+                    : "Avalonia bitmap";
+                TxtRomInfo.Text = $"{name} • Mapper {cart.MapperId} • PRG: {cart.PrgBanks * 16}KB • CHR: {cart.ChrBanks * 8}KB • {cart.Mirror} • {renderer}";
+            });
 
-                    Dispatcher.UIThread.Post(() =>
-                    {
-                        UpdateLibraryPanel();
-                        WelcomeOverlay.IsVisible = false;
-                        GameViewbox.IsVisible = false;
-                        DetachedGameOverlay.IsVisible = true;
-                        UpdateRecentMenu();
-                        string name = Path.GetFileName(path);
-                        Title = $"Mogiki NES - {name} (Mapper {cart.MapperId})";
-                        ShowGameWindow(name);
-                        TxtStatus.Text = "● RUNNING";
-                        TxtStatus.Foreground = new SolidColorBrush(Color.Parse("#4ADE80"));
-                        TxtRomInfo.Text = $"{name} • Mapper {cart.MapperId} • PRG: {cart.PrgBanks * 16}KB • CHR: {cart.ChrBanks * 8}KB • {cart.Mirror}";
-                    });
-
-                    return true;
-                }
-            }
+            return true;
         }
         catch (Exception ex)
         {
@@ -329,14 +321,13 @@ public partial class MainWindow : Window
 
     private void OnTogglePauseClick(object? sender, RoutedEventArgs e)
     {
-        if (!_romLoaded) return;
-        _isPaused = !_isPaused;
-        _audio.Pause(_isPaused || !_config.SoundEnabled);
+        if (!_emulation.IsRomLoaded) return;
+        _emulation.IsPaused = !_emulation.IsPaused;
 
         Dispatcher.UIThread.Post(() =>
         {
-            TxtStatus.Text = _isPaused ? "❚❚ PAUSED" : "● RUNNING";
-            TxtStatus.Foreground = _isPaused
+            TxtStatus.Text = _emulation.IsPaused ? "❚❚ PAUSED" : "● RUNNING";
+            TxtStatus.Foreground = _emulation.IsPaused
                 ? new SolidColorBrush(Color.Parse("#FACC15"))
                 : new SolidColorBrush(Color.Parse("#4ADE80"));
         });
@@ -346,14 +337,10 @@ public partial class MainWindow : Window
 
     private void StopAndReturnToLibrary()
     {
-        if (!_romLoaded) return;
+        if (!_emulation.IsRomLoaded) return;
 
-        // The emulation loop remains alive for the next game, but no longer
-        // clocks the bus while the launcher/library is visible.
-        _isPaused = true;
-        _romLoaded = false;
+        _emulation.StopGame();
         _controllerState = 0;
-        _audio.Pause(true);
         CloseGameWindow();
 
         Dispatcher.UIThread.Post(() =>
@@ -372,6 +359,18 @@ public partial class MainWindow : Window
 
     private void ShowGameWindow(string gameName)
     {
+        _sdlRenderer ??= CreateSdlRenderer();
+        if (_sdlRenderer.TryStart(
+                $"Mogiki - {gameName}",
+                (int)GameScreen.Width,
+                (int)GameScreen.Height,
+                _config.WindowScale,
+                _config.BilinearFilter))
+        {
+            _sdlRenderer.SetBilinearFilter(_config.BilinearFilter);
+            return;
+        }
+
         if (_gameWindow == null)
         {
             var window = new GameWindow(_screenBitmap, GameScreen.Width, GameScreen.Height);
@@ -396,6 +395,16 @@ public partial class MainWindow : Window
 
     private void CloseGameWindow()
     {
+        var sdlRenderer = _sdlRenderer;
+        _sdlRenderer = null;
+
+        if (sdlRenderer != null)
+        {
+            _closingGameWindow = true;
+            sdlRenderer.Dispose();
+            _closingGameWindow = false;
+        }
+
         var window = _gameWindow;
         _gameWindow = null;
         if (window == null)
@@ -413,7 +422,7 @@ public partial class MainWindow : Window
             _gameWindow = null;
         }
 
-        if (!_closingGameWindow && _romLoaded)
+        if (!_closingGameWindow && _emulation.IsRomLoaded)
         {
             StopAndReturnToLibrary();
         }
@@ -421,7 +430,121 @@ public partial class MainWindow : Window
 
     private void OnToggleFullscreenClick(object? sender, RoutedEventArgs e)
     {
-        _gameWindow?.ToggleFullscreen();
+        if (_sdlRenderer?.IsAvailable == true)
+            _sdlRenderer.ToggleFullscreen();
+        else
+            _gameWindow?.ToggleFullscreen();
+    }
+
+    private Sdl3GpuRenderer CreateSdlRenderer()
+    {
+        var renderer = new Sdl3GpuRenderer(_config.RendererBackend);
+        renderer.Closed += OnSdlRendererClosed;
+        renderer.KeyChanged += OnSdlKeyChanged;
+        return renderer;
+    }
+
+    private void OnSdlRendererClosed()
+    {
+        if (!_closingGameWindow && _emulation.IsRomLoaded)
+            StopAndReturnToLibrary();
+    }
+
+    private void OnSdlKeyChanged(uint keyCode, bool isDown)
+    {
+        if (!TryMapSdlKey(keyCode, out Key key))
+            return;
+
+        if (!isDown)
+        {
+            ApplyControllerKey(key, false);
+            return;
+        }
+
+        if (key == Key.F11)
+        {
+            OnToggleFullscreenClick(null, null!);
+            return;
+        }
+
+        if (key == Key.Escape)
+        {
+            OnStopClick(null, null!);
+            return;
+        }
+
+        if (key == Key.Tab)
+        {
+            _emulation.FastForward = !_emulation.FastForward;
+            return;
+        }
+
+        if (key == Key.Space || key == Key.P)
+        {
+            OnTogglePauseClick(null, null!);
+            return;
+        }
+
+        if (key == Key.R)
+        {
+            OnResetClick(null, null!);
+            return;
+        }
+
+        ApplyControllerKey(key, true);
+    }
+
+    private void ApplyControllerKey(Key key, bool pressed)
+    {
+        if (pressed)
+        {
+            if (key == _config.Keys.A) _controllerState |= 0x80;
+            else if (key == _config.Keys.B) _controllerState |= 0x40;
+            else if (key == _config.Keys.Select) _controllerState |= 0x20;
+            else if (key == _config.Keys.Start) _controllerState |= 0x10;
+            else if (key == _config.Keys.Up) _controllerState |= 0x08;
+            else if (key == _config.Keys.Down) _controllerState |= 0x04;
+            else if (key == _config.Keys.Left) _controllerState |= 0x02;
+            else if (key == _config.Keys.Right) _controllerState |= 0x01;
+        }
+        else
+        {
+            if (key == _config.Keys.A) _controllerState = (byte)(_controllerState & ~0x80);
+            else if (key == _config.Keys.B) _controllerState = (byte)(_controllerState & ~0x40);
+            else if (key == _config.Keys.Select) _controllerState = (byte)(_controllerState & ~0x20);
+            else if (key == _config.Keys.Start) _controllerState = (byte)(_controllerState & ~0x10);
+            else if (key == _config.Keys.Up) _controllerState = (byte)(_controllerState & ~0x08);
+            else if (key == _config.Keys.Down) _controllerState = (byte)(_controllerState & ~0x04);
+            else if (key == _config.Keys.Left) _controllerState = (byte)(_controllerState & ~0x02);
+            else if (key == _config.Keys.Right) _controllerState = (byte)(_controllerState & ~0x01);
+        }
+
+        _emulation.SetControllerState(_controllerState);
+    }
+
+    private static bool TryMapSdlKey(uint keyCode, out Key key)
+    {
+        if (keyCode is >= (uint)'a' and <= (uint)'z')
+        {
+            key = (Key)Enum.Parse(typeof(Key), ((char)keyCode).ToString().ToUpperInvariant());
+            return true;
+        }
+
+        key = keyCode switch
+        {
+            0x1B => Key.Escape,
+            0x09 => Key.Tab,
+            0x20 => Key.Space,
+            0x4000003A => Key.F1,
+            0x40000044 => Key.F11,
+            0x4000004F => Key.Right,
+            0x40000050 => Key.Left,
+            0x40000051 => Key.Down,
+            0x40000052 => Key.Up,
+            _ => Key.None
+        };
+
+        return key != Key.None;
     }
 
     private void OnGameWindowKeyDown(object? sender, KeyEventArgs e)
@@ -436,12 +559,8 @@ public partial class MainWindow : Window
 
     private void OnResetClick(object? sender, RoutedEventArgs e)
     {
-        if (!_romLoaded) return;
-        lock (_renderLock)
-        {
-            _bus.Reset();
-            _audio.Reset();
-        }
+        if (!_emulation.IsRomLoaded) return;
+        _emulation.Reset();
     }
 
     private void OnScale1xClick(object? sender, RoutedEventArgs e) => ApplyScale(1);
@@ -473,30 +592,31 @@ public partial class MainWindow : Window
         RenderOptions.SetBitmapInterpolationMode(GameScreen,
             _config.BilinearFilter ? BitmapInterpolationMode.LowQuality : BitmapInterpolationMode.None);
         _gameWindow?.SetBilinearFilter(_config.BilinearFilter);
+        _sdlRenderer?.SetBilinearFilter(_config.BilinearFilter);
     }
 
     private void OnToggleSoundClick(object? sender, RoutedEventArgs e)
     {
         _config.SoundEnabled = !_config.SoundEnabled;
-        _audio.Pause(!_config.SoundEnabled || _isPaused);
+        _emulation.SoundEnabled = _config.SoundEnabled;
     }
 
     private async void OnControllerConfigClick(object? sender, RoutedEventArgs e)
     {
-        bool wasPaused = _isPaused;
-        _isPaused = true;
+        bool wasPaused = _emulation.IsPaused;
+        _emulation.IsPaused = true;
         var dlg = new ControllerConfigWindow(_config.Keys);
         await dlg.ShowDialog(this);
         if (dlg.IsSaved)
         {
             _config.Save("config.ini");
         }
-        _isPaused = wasPaused;
+        _emulation.IsPaused = wasPaused;
     }
 
     private void OnPatternTableClick(object? sender, RoutedEventArgs e)
     {
-        new PatternTableWindow(_bus).Show(this);
+        new PatternTableWindow(_session.Bus).Show(this);
     }
 
     private async void OnAboutClick(object? sender, RoutedEventArgs e)
@@ -506,14 +626,11 @@ public partial class MainWindow : Window
 
     private void OnTakeScreenshotClick(object? sender, RoutedEventArgs e)
     {
-        if (!_romLoaded) return;
+        if (!_emulation.IsRomLoaded) return;
         try
         {
             string fileName = $"screenshot_{DateTime.Now:yyyyMMdd_HHmmss}.png";
-            lock (_renderLock)
-            {
-                _screenBitmap.Save(fileName);
-            }
+            _screenBitmap.Save(fileName);
             Dispatcher.UIThread.Post(() => TxtRomInfo.Text = $"Saved screenshot: {fileName}");
         }
         catch (Exception ex)
@@ -572,7 +689,7 @@ public partial class MainWindow : Window
         }
         if (k == Key.Tab)
         {
-            _fastForward = !_fastForward;
+            _emulation.FastForward = !_emulation.FastForward;
             e.Handled = true;
             return;
         }
@@ -603,6 +720,8 @@ public partial class MainWindow : Window
         else if (k == _config.Keys.Down) _controllerState |= 0x04;
         else if (k == _config.Keys.Left) _controllerState |= 0x02;
         else if (k == _config.Keys.Right) _controllerState |= 0x01;
+
+        _emulation.SetControllerState(_controllerState);
     }
 
     private void OnKeyUpHandler(object? sender, KeyEventArgs e)
@@ -616,115 +735,59 @@ public partial class MainWindow : Window
         else if (k == _config.Keys.Down) _controllerState = (byte)(_controllerState & ~0x04);
         else if (k == _config.Keys.Left) _controllerState = (byte)(_controllerState & ~0x02);
         else if (k == _config.Keys.Right) _controllerState = (byte)(_controllerState & ~0x01);
+
+        _emulation.SetControllerState(_controllerState);
     }
 
-    private unsafe void EmulationLoop()
+    private void OnFrameReady()
     {
-        const double targetFrameTimeMs = 1000.0 / 60.0988; // NTSC 60.0988 Hz
-        var frameStopwatch = Stopwatch.StartNew();
+        if (Interlocked.Exchange(ref _renderPending, 1) != 0)
+            return;
 
-        const double cpuFreq = 1789773.0;
-        double sampleFreq = _audio.SampleRate > 0 ? _audio.SampleRate : 44100;
-        double cyclesPerSample = cpuFreq / sampleFreq;
-        double audioSampleCounter = 0.0;
-        double lastSample = 0.0;
-        const double filterAlpha = 0.4;
+        Dispatcher.UIThread.Post(PresentLatestFrame, DispatcherPriority.Render);
+    }
 
-        while (_isRunning)
+    private unsafe void PresentLatestFrame()
+    {
+        try
         {
-            if (_romLoaded && !_isPaused)
+            if (_framePipeline.TryAcquireLatest(out var frame))
             {
-                _bus.Controller[0] = _controllerState;
-
-                lock (_renderLock)
+                using (frame)
+                using (var locked = _screenBitmap.Lock())
                 {
-                    do
-                    {
-                        _bus.Clock();
-
-                        audioSampleCounter += 1.0 / 3.0;
-                        if (audioSampleCounter >= cyclesPerSample)
-                        {
-                            audioSampleCounter -= cyclesPerSample;
-                            if (_config.SoundEnabled)
-                            {
-                                double rawSample = _bus.GetAudioSample();
-                                double filtered = lastSample + filterAlpha * (rawSample - lastSample);
-                                lastSample = filtered;
-
-                                float vol = (_config.Volume / 100.0f) * 0.5f;
-                                _audio.WriteSample((float)(filtered * vol));
-                            }
-                        }
-                    } while (!_bus.Ppu.FrameComplete);
-
-                    _bus.Ppu.FrameComplete = false;
-
-                    // Copy Screen buffer directly to Avalonia WriteableBitmap memory
-                    using (var locked = _screenBitmap.Lock())
-                    {
-                        fixed (uint* src = _bus.Ppu.ScreenArgb)
-                        {
-                            Buffer.MemoryCopy(src, (void*)locked.Address, 256 * 240 * sizeof(uint), 256 * 240 * sizeof(uint));
-                        }
-                    }
+                    var destination = new Span<uint>((void*)locked.Address, FrameBufferPipeline.PixelCount);
+                    frame.Buffer.AsSpan().CopyTo(destination);
+                    _sdlRenderer?.Present(frame.Buffer);
                 }
 
-                _renderedFrames++;
-                if (_fpsStopwatch.ElapsedMilliseconds >= 1000)
-                {
-                    _currentFps = _renderedFrames * 1000.0 / _fpsStopwatch.ElapsedMilliseconds;
-                    _renderedFrames = 0;
-                    _fpsStopwatch.Restart();
-                    Dispatcher.UIThread.Post(() => TxtFps.Text = $"{_currentFps:F1} FPS");
-                }
-
-                // Invalidate visual on UI thread
-                if (!_renderPending)
-                {
-                    _renderPending = true;
-                    Dispatcher.UIThread.Post(() =>
-                    {
-                        GameScreen.InvalidateVisual();
-                        _gameWindow?.InvalidateGameScreen();
-                        _renderPending = false;
-                    }, DispatcherPriority.Render);
-                }
-
-                // High precision 1ms frame pacing
-                if (!_fastForward)
-                {
-                    double elapsed = frameStopwatch.Elapsed.TotalMilliseconds;
-                    double sleepTime = targetFrameTimeMs - elapsed;
-
-                    if (sleepTime > 1.5)
-                    {
-                        Thread.Sleep((int)(sleepTime - 1.0));
-                    }
-                    while (frameStopwatch.Elapsed.TotalMilliseconds < targetFrameTimeMs)
-                    {
-                        Thread.SpinWait(10);
-                    }
-                    frameStopwatch.Restart();
-                }
-                else
-                {
-                    frameStopwatch.Restart();
-                }
-            }
-            else
-            {
-                Thread.Sleep(16);
+                GameScreen.InvalidateVisual();
+                _gameWindow?.InvalidateGameScreen();
             }
         }
+        finally
+        {
+            Volatile.Write(ref _renderPending, 0);
+            if (_framePipeline.HasPublishedFrame)
+                OnFrameReady();
+        }
+    }
+
+    private void OnFpsUpdated(double fps)
+    {
+        Dispatcher.UIThread.Post(() => TxtFps.Text = $"{fps:F1} FPS");
+    }
+
+    private void OnEmulationFaulted(Exception exception)
+    {
+        Console.Error.WriteLine($"Emulation thread stopped: {exception}");
+        Dispatcher.UIThread.Post(() => TxtStatus.Text = "EMULATION ERROR");
     }
 
     private void OnWindowClosed(object? sender, EventArgs e)
     {
         CloseGameWindow();
-        _isRunning = false;
-        _emulationThread.Join(500);
-        _audio.Dispose();
+        _emulation.Dispose();
         _screenBitmap.Dispose();
         _config.Save("config.ini");
 

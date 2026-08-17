@@ -30,6 +30,7 @@ public sealed class AppConfig
     public List<string> RecentRoms { get; set; } = [];
     public AspectRatioMode AspectRatio { get; set; } = AspectRatioMode.Standard4_3;
     public bool BilinearFilter { get; set; } = false;
+    public string RendererBackend { get; set; } = "auto";
     public int Volume { get; set; } = 100; // 0 to 100
     public bool SoundEnabled { get; set; } = true;
 
@@ -92,6 +93,10 @@ public sealed class AppConfig
                     BilinearFilter = filter;
                     break;
 
+                case "renderer" when !string.IsNullOrWhiteSpace(val):
+                    RendererBackend = val.ToLowerInvariant();
+                    break;
+
                 case "lastrom":
                     LastRomPath = val;
                     break;
@@ -126,6 +131,7 @@ public sealed class AppConfig
         writer.WriteLine($"scale={WindowScale}");
         writer.WriteLine($"aspect={AspectRatio}");
         writer.WriteLine($"bilinear={BilinearFilter}");
+        writer.WriteLine($"renderer={RendererBackend}");
         writer.WriteLine();
         writer.WriteLine("[Audio]");
         writer.WriteLine($"sound={SoundEnabled}");

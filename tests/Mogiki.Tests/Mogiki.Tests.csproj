@@ -22,4 +22,10 @@
     <ProjectReference Include="..\..\src\Mogiki.Core\Mogiki.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\Roms\**" LinkBase="Roms">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

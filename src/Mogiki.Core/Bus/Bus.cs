@@ -20,6 +20,7 @@ public sealed class Bus
     // Controllers
     public byte[] Controller { get; } = new byte[2];
     private readonly byte[] _controllerState = new byte[2];
+    private bool _controllerStrobe;
 
     // Clock
     private uint _systemClockCounter;
@@ -44,6 +45,12 @@ public sealed class Bus
         Ppu.Cartridge = cartridge;
     }
 
+    public void RemoveCartridge()
+    {
+        Cartridge = null;
+        Ppu.Cartridge = null;
+    }
+
     public void Reset()
     {
         Cartridge?.Reset();
@@ -53,6 +60,9 @@ public sealed class Bus
         _systemClockCounter = 0;
         _dmaTransfer = false;
         _dmaDummy = true;
+        _controllerStrobe = false;
+        _controllerState[0] = 0;
+        _controllerState[1] = 0;
     }
 
     public void Clock()
@@ -147,11 +157,24 @@ public sealed class Bus
         }
         else if (addr is >= 0x4016 and <= 0x4017)
         {
-            if (addr == 0x4017)
+            if (addr == 0x4016)
+            {
+                bool strobe = (data & 0x01) != 0;
+
+                // A high strobe continuously exposes the current A button.
+                // The falling edge latches both controller ports for serial
+                // reads, matching the NES controller protocol.
+                if (strobe || _controllerStrobe)
+                {
+                    LatchControllers();
+                }
+
+                _controllerStrobe = strobe;
+            }
+            else
             {
                 Apu.CpuWrite(addr, data);
             }
-            _controllerState[addr & 0x0001] = Controller[addr & 0x0001];
         }
     }
 
@@ -184,11 +207,25 @@ public sealed class Bus
 
         if (addr is >= 0x4016 and <= 0x4017)
         {
-            byte val = (byte)((_controllerState[addr & 0x0001] & 0x80) != 0 ? 1 : 0);
-            _controllerState[addr & 0x0001] <<= 1;
+            int port = addr & 0x0001;
+            byte val = (byte)(((_controllerStrobe ? Controller[port] : _controllerState[port]) & 0x80) != 0 ? 1 : 0);
+
+            if (!_controllerStrobe)
+            {
+                // Once all eight buttons have been shifted out, real NES
+                // controllers keep returning 1 rather than 0.
+                _controllerState[port] = (byte)((_controllerState[port] << 1) | 0x01);
+            }
+
             return val;
         }
 
         return 0x00;
+    }
+
+    private void LatchControllers()
+    {
+        _controllerState[0] = Controller[0];
+        _controllerState[1] = Controller[1];
     }
 }
